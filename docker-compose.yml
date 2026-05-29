@@ -11,6 +11,18 @@ services:
       CORS_ORIGINS: '["http://localhost","http://localhost:8080","http://127.0.0.1:8080"]'
     volumes:
       - momentum_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
@@ -20,7 +32,8 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
   # Optional — not used by the app today (SQLite is default)
