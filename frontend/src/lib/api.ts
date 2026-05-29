@@ -106,8 +106,10 @@ export const api = {
   deleteStream: (id: number) => fetchJson<void>(`/streams/${id}`, { method: 'DELETE' }),
   deleteItem: (id: number) => fetchJson<void>(`/items/${id}`, { method: 'DELETE' }),
   getItem: (id: number) => fetchJson<Item>(`/items/${id}`),
-  updateItem: (id: number, payload: Partial<Pick<Item, 'status' | 'title' | 'description' | 'notes'>>) =>
-    fetchJson<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  updateItem: (
+    id: number,
+    payload: Partial<Pick<Item, 'status' | 'title' | 'description' | 'notes' | 'stream_id'>>,
+  ) => fetchJson<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   capture: (content: string, streamId: number) =>
     fetchJson<CaptureResult>('/capture', {
       method: 'POST',

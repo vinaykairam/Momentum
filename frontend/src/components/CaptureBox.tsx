@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2, Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+const ease = [0.25, 0.1, 0.25, 1] as const
+
 export function CaptureBox() {
   const open = useAppStore((s) => s.captureOpen)
   const setOpen = useAppStore((s) => s.setCaptureOpen)
@@ -62,10 +64,10 @@ export function CaptureBox() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)} className="gap-1.5 text-muted">
-        <Plus className="h-4 w-4" />
+      <Button variant="ghost" size="md" onClick={() => setOpen(true)} className="gap-1.5 text-muted">
+        <Plus className="h-4 w-4 opacity-60" />
         Capture
-        <kbd className="ml-1 rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-mono dark:bg-white/10">⌘J</kbd>
+        <kbd className="ml-1 rounded bg-black/5 px-1.5 py-0.5 text-xs font-mono dark:bg-white/10">⌘J</kbd>
       </Button>
 
       <AnimatePresence>
@@ -74,20 +76,25 @@ export function CaptureBox() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 p-4 pt-[12vh] backdrop-blur-sm"
+            transition={{ duration: 0.3, ease }}
+            className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 p-4 pt-[10vh] backdrop-blur-sm"
             onClick={() => setOpen(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: -8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: -8 }}
-              className="glass w-full max-w-xl rounded-2xl p-6 shadow-2xl"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.35, ease }}
+              className="glass w-full max-w-2xl rounded-2xl p-6 md:p-8"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Capture anything</h2>
-                <button onClick={() => setOpen(false)} className="rounded-lg p-1 hover:bg-black/5 dark:hover:bg-white/5">
-                  <X className="h-4 w-4" />
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="page-title text-2xl md:text-3xl">Capture</h2>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg p-2 text-muted transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 
@@ -95,9 +102,9 @@ export function CaptureBox() {
                 ref={inputRef}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Paste a task, idea, YouTube link, article, note..."
+                placeholder="Task, idea, link, note..."
                 rows={4}
-                className="w-full resize-none rounded-xl border border-border bg-transparent p-4 text-base outline-none placeholder:text-muted/60 focus:ring-2 focus:ring-accent/30"
+                className="field-input resize-none text-lg leading-relaxed"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCapture) {
                     handleCapture()
@@ -105,29 +112,28 @@ export function CaptureBox() {
                 }}
               />
 
-              <div className="mt-4 space-y-2">
-                <label className="text-xs font-medium uppercase tracking-wider text-muted">Stream</label>
+              <div className="mt-5 space-y-2">
+                <label className="page-label">Stream</label>
                 <StreamSelect
                   streams={streams}
                   value={streamId}
                   onChange={setStreamId}
                   disabled={mutation.isPending}
                 />
-                <p className="text-xs text-muted">Choose which stream this item belongs to</p>
               </div>
 
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs text-muted">⌘↵ to capture</span>
-                <Button variant="accent" disabled={!canCapture || mutation.isPending} onClick={handleCapture}>
+              <div className="mt-6 flex items-center justify-between">
+                <span className="page-meta">⌘↵ to capture</span>
+                <Button variant="accent" size="md" disabled={!canCapture || mutation.isPending} onClick={handleCapture}>
                   {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Capture'}
                 </Button>
               </div>
 
               {mutation.isSuccess && (
-                <p className="mt-3 text-sm text-thriving">Saved to {mutation.data.stream_name}</p>
+                <p className="page-meta mt-4 text-thriving">Saved to {mutation.data.stream_name}</p>
               )}
               {mutation.isError && (
-                <p className="mt-3 text-sm text-critical">
+                <p className="page-meta mt-4 text-critical">
                   {mutation.error instanceof Error ? mutation.error.message : 'Could not capture.'}
                 </p>
               )}
