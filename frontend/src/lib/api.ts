@@ -52,6 +52,20 @@ export interface CaptureResult {
   stream_name: string
 }
 
+export interface StreamSuggestionOption {
+  stream_id: number
+  stream_name: string
+  confidence: number
+  reason: string
+}
+
+export interface StreamSuggestion {
+  status: 'confident' | 'ambiguous' | 'unavailable'
+  recommended: StreamSuggestionOption | null
+  options: StreamSuggestionOption[]
+  reasoning: string
+}
+
 export interface Item {
   id: number
   stream_id: number
@@ -110,6 +124,11 @@ export const api = {
     id: number,
     payload: Partial<Pick<Item, 'status' | 'title' | 'description' | 'notes' | 'stream_id'>>,
   ) => fetchJson<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  suggestStream: (content: string) =>
+    fetchJson<StreamSuggestion>('/capture/suggest-stream', {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
   capture: (content: string, streamId: number) =>
     fetchJson<CaptureResult>('/capture', {
       method: 'POST',

@@ -1,20 +1,28 @@
 import { Button } from '@/components/ui/button'
 import { StreamSelect } from '@/components/StreamSelect'
-import { api } from '@/lib/api'
+import { StreamSuggestionPicker } from '@/components/StreamSuggestionPicker'
+import { api, type StreamSuggestion } from '@/lib/api'
 import { useAppStore } from '@/store/app'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Loader2, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Loader2, Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 const ease = [0.25, 0.1, 0.25, 1] as const
+const SUGGEST_DEBOUNCE_MS = 700
+const MIN_SUGGEST_LENGTH = 8
 
 export function CaptureBox() {
   const open = useAppStore((s) => s.captureOpen)
   const setOpen = useAppStore((s) => s.setCaptureOpen)
   const [content, setContent] = useState('')
   const [streamId, setStreamId] = useState<number | ''>('')
+  const [suggestion, setSuggestion] = useState<StreamSuggestion | null>(null)
+  const [suggesting, setSuggesting] = useState(false)
+  const [showManualStream, setShowManualStream] = useState(false)
+  const [userPickedStream, setUserPickedStream] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const suggestRequestId = useRef(0)
   const queryClient = useQueryClient()
 
   const { data: streams = [] } = useQuery({
@@ -28,6 +36,9 @@ export function CaptureBox() {
     onSuccess: () => {
       setContent('')
       setStreamId('')
+      setSuggestion(null)
+      setShowManualStream(false)
+      setUserPickedStream(false)
       setOpen(false)
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['items'] })
@@ -52,6 +63,65 @@ export function CaptureBox() {
     return () => window.removeEventListener('keydown', handler)
   }, [setOpen])
 
+  useEffect(() => {
+    if (!open) return
+
+    const trimmed = content.trim()
+    if (trimmed.length < MIN_SUGGEST_LENGTH) {
+      setSuggestion(null)
+      setSuggesting(false)
+      if (!userPickedStream) setStreamId('')
+      return
+    }
+
+    const requestId = ++suggestRequestId.current
+    setSuggesting(true)
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await api.suggestStream(trimmed)
+        if (requestId !== suggestRequestId.current) return
+
+        setSuggestion(result)
+        if (result.status === 'unavailable') {
+          setShowManualStream(true)
+        }
+        if (!userPickedStream) {
+          if (result.status === 'confident' && result.recommended) {
+            setStreamId(result.recommended.stream_id)
+          } else if (result.status === 'ambiguous') {
+            setStreamId('')
+          }
+        }
+      } catch {
+        if (requestId !== suggestRequestId.current) return
+        setSuggestion({
+          status: 'unavailable',
+          recommended: null,
+          options: [],
+          reasoning: 'Could not get a suggestion. Pick a stream below.',
+        })
+        setShowManualStream(true)
+      } finally {
+        if (requestId === suggestRequestId.current) {
+          setSuggesting(false)
+        }
+      }
+    }, SUGGEST_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [content, open, userPickedStream])
+
+  const handleStreamSelect = (value: number | '') => {
+    setUserPickedStream(true)
+    setStreamId(value)
+  }
+
+  const handleSuggestionSelect = (id: number) => {
+    setUserPickedStream(true)
+    setStreamId(id)
+  }
+
   const canCapture = content.trim().length > 0 && streamId !== ''
 
   const handleCapture = () => {
@@ -60,6 +130,13 @@ export function CaptureBox() {
       text: content.trim(),
       stream: streamId as number,
     })
+  }
+
+  const resetOnClose = () => {
+    setOpen(false)
+    setSuggestion(null)
+    setShowManualStream(false)
+    setUserPickedStream(false)
   }
 
   return (
@@ -78,7 +155,7 @@ export function CaptureBox() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease }}
             className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 p-4 pt-[10vh] backdrop-blur-sm"
-            onClick={() => setOpen(false)}
+            onClick={resetOnClose}
           >
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -91,7 +168,7 @@ export function CaptureBox() {
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="page-title text-2xl md:text-3xl">Capture</h2>
                 <button
-                  onClick={() => setOpen(false)}
+                  onClick={resetOnClose}
                   className="rounded-lg p-2 text-muted transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                 >
                   <X className="h-5 w-5" />
@@ -101,7 +178,10 @@ export function CaptureBox() {
               <textarea
                 ref={inputRef}
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={(e) => {
+                  setContent(e.target.value)
+                  setUserPickedStream(false)
+                }}
                 placeholder="Task, idea, link, note..."
                 rows={4}
                 className="field-input resize-none text-lg leading-relaxed"
@@ -112,14 +192,39 @@ export function CaptureBox() {
                 }}
               />
 
-              <div className="mt-5 space-y-2">
+              <div className="mt-5 space-y-3">
                 <label className="page-label">Stream</label>
-                <StreamSelect
-                  streams={streams}
-                  value={streamId}
-                  onChange={setStreamId}
-                  disabled={mutation.isPending}
+                <StreamSuggestionPicker
+                  suggestion={suggestion}
+                  isLoading={suggesting && content.trim().length >= MIN_SUGGEST_LENGTH}
+                  selectedStreamId={streamId}
+                  onSelect={handleSuggestionSelect}
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setShowManualStream((v) => !v)}
+                  className="page-meta flex items-center gap-1 text-accent hover:underline"
+                >
+                  {showManualStream ? (
+                    <>
+                      Hide stream list <ChevronUp className="h-3.5 w-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      Choose stream manually <ChevronDown className="h-3.5 w-3.5" />
+                    </>
+                  )}
+                </button>
+
+                {showManualStream && (
+                  <StreamSelect
+                    streams={streams}
+                    value={streamId}
+                    onChange={handleStreamSelect}
+                    disabled={mutation.isPending}
+                  />
+                )}
               </div>
 
               <div className="mt-6 flex items-center justify-between">

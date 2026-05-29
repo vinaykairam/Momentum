@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     seed_demo_data: bool = False
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.0-flash"
 
 
 settings = Settings()
