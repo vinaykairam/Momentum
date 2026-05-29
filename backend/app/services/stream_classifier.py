@@ -238,19 +238,28 @@ def suggest_stream_for_capture(content: str, db: Session) -> StreamSuggestionRes
     contexts = _build_stream_contexts(db, streams)
     options: list[StreamSuggestionOption] = []
 
+    gemini_failure: str | None = None
     if settings.gemini_api_key:
         try:
             options = _call_gemini(content, contexts)
-        except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError, TypeError):
+        except httpx.HTTPStatusError as exc:
+            gemini_failure = exc.response.text[:200] if exc.response is not None else str(exc)
+            options = []
+        except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
+            gemini_failure = str(exc)
             options = []
 
     if not options:
         options = _heuristic_classify(content, contexts)
-        reasoning = (
-            "Keyword match (set GEMINI_API_KEY for smarter suggestions)."
-            if not settings.gemini_api_key
-            else "AI suggestion failed; using keyword match."
-        )
+        if not settings.gemini_api_key:
+            reasoning = "Keyword match (set GEMINI_API_KEY for smarter suggestions)."
+        elif gemini_failure and "no longer available" in gemini_failure.lower():
+            reasoning = (
+                f"Model {settings.gemini_model!r} is retired for your API key. "
+                "Set GEMINI_MODEL=gemini-2.5-flash in backend/.env and restart."
+            )
+        else:
+            reasoning = "AI suggestion failed; using keyword match."
         return _build_response(options, reasoning)
 
     return _build_response(options, options[0].reason if options else "")
