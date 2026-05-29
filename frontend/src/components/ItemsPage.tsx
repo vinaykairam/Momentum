@@ -5,15 +5,80 @@ import { Button } from '@/components/ui/button'
 import { api, type Stream } from '@/lib/api'
 import { filterQueuedItems, sortQueuedItems } from '@/lib/item-queue'
 import { groupItemsByStreamTree, type StreamItemGroup } from '@/lib/stream-tree'
+import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
-import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronDown } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 interface ItemsPageProps {
   onBack: () => void
 }
 
 const ease = [0.25, 0.1, 0.25, 1] as const
+
+function countGroupItems(group: StreamItemGroup): number {
+  return group.items.length + group.children.reduce((sum, child) => sum + countGroupItems(child), 0)
+}
+
+function CollapsibleSection({
+  title,
+  itemCount,
+  nested,
+  children,
+}: {
+  title: string
+  itemCount: number
+  nested?: boolean
+  children: ReactNode
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const panelId = `stream-panel-${title.replace(/\s+/g, '-').toLowerCase()}`
+
+  return (
+    <div className={cn(nested && 'border-l border-border/50 pl-4')}>
+      <button
+        type="button"
+        className={cn(
+          'flex w-full items-center gap-3 text-left transition-colors hover:text-foreground',
+          nested ? 'py-3' : 'px-1 py-4',
+        )}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((open) => !open)}
+      >
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-muted transition-transform duration-200',
+            !expanded && '-rotate-90',
+          )}
+          aria-hidden="true"
+        />
+        <span className={cn('min-w-0 flex-1 truncate', nested ? 'page-label text-foreground' : 'page-body')}>
+          {title}
+        </span>
+        <span className="page-meta shrink-0 tabular-nums">
+          {itemCount} {itemCount === 1 ? 'item' : 'items'}
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            id={panelId}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease }}
+            className="overflow-hidden"
+          >
+            <div className={cn(nested ? 'pb-1' : 'border-t border-border/40 px-1 pb-2 pt-1')}>{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 function StreamQueue({
   group,
@@ -60,41 +125,43 @@ function StreamQueue({
     )
   }
 
+  const itemCount = countGroupItems(group)
+
+  const itemList =
+    queuedItems.length > 0 ? (
+      <div className="divide-y divide-border/40">{queuedItems.map(renderItemRow)}</div>
+    ) : null
+
   if (hasChildren) {
     return (
-      <>
-        {!nested && <p className="page-label pb-2 pt-5 first:pt-0">{group.stream.name}</p>}
-        {queuedItems.length > 0 && (
-          <div className="divide-y divide-border/40">
-            {queuedItems.map(renderItemRow)}
+      <CollapsibleSection title={group.stream.name} itemCount={itemCount} nested={nested}>
+        {itemList}
+        {group.children.length > 0 && (
+          <div className={cn('space-y-1', itemList && 'mt-2')}>
+            {group.children.map((child) => (
+              <StreamQueue
+                key={child.stream.id}
+                group={child}
+                streams={streams}
+                nested
+                confirmDeleteId={confirmDeleteId}
+                isDeleting={isDeleting}
+                onConfirmDelete={onConfirmDelete}
+                onCancelDelete={onCancelDelete}
+                onDelete={onDelete}
+                onMoved={onMoved}
+              />
+            ))}
           </div>
         )}
-        {group.children.map((child) => (
-          <div key={child.stream.id} className="ml-0 pt-2">
-            <StreamQueue
-              group={child}
-              streams={streams}
-              nested
-              confirmDeleteId={confirmDeleteId}
-              isDeleting={isDeleting}
-              onConfirmDelete={onConfirmDelete}
-              onCancelDelete={onCancelDelete}
-              onDelete={onDelete}
-              onMoved={onMoved}
-            />
-          </div>
-        ))}
-      </>
+      </CollapsibleSection>
     )
   }
 
   return (
-    <>
-      <p className={`page-label ${nested ? 'pb-2 pt-4' : 'pb-2 pt-5 first:pt-0'}`}>{group.stream.name}</p>
-      <div className="divide-y divide-border/40">
-        {queuedItems.map(renderItemRow)}
-      </div>
-    </>
+    <CollapsibleSection title={group.stream.name} itemCount={itemCount} nested={nested}>
+      {itemList}
+    </CollapsibleSection>
   )
 }
 
@@ -166,13 +233,14 @@ export function ItemsPage({ onBack }: ItemsPageProps) {
       {groupedItems.length === 0 ? (
         <p className="page-body py-16 text-center text-muted">No items yet. Use Capture to add something.</p>
       ) : (
-        <div className="divide-y divide-border/40">
+        <div className="space-y-4">
           {groupedItems.map((group, groupIndex) => (
             <motion.section
               key={group.stream.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: groupIndex * 0.04, duration: 0.5, ease }}
+              className="stream-group !py-0"
             >
               <StreamQueue group={group} {...rowHandlers} />
             </motion.section>
