@@ -3,11 +3,21 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.models.item import Item, ItemEffort, ItemStatus
 from app.models.stream import MomentumState, Stream, StreamCategory
 from app.schemas.focus import FocusRecommendation
+
+ITEM_STATUS_SORT = case(
+    (Item.status == ItemStatus.next, 0),
+    (Item.status == ItemStatus.active, 1),
+    (Item.status == ItemStatus.backlog, 2),
+    (Item.status == ItemStatus.completed, 3),
+    (Item.status == ItemStatus.archived, 4),
+    else_=5,
+)
 
 
 def _is_weekend(day: date | None = None) -> bool:
@@ -138,7 +148,7 @@ def _pick_action_item(stream: Stream, db: Session) -> Item | None:
             Item.stream_id == stream.id,
             Item.status.in_([ItemStatus.next, ItemStatus.active, ItemStatus.backlog]),
         )
-        .order_by(Item.status.desc(), Item.updated_at.desc())
+        .order_by(ITEM_STATUS_SORT, Item.created_at.asc(), Item.id.asc())
         .first()
     )
 
