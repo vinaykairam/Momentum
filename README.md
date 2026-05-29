@@ -64,11 +64,13 @@ Copy `backend/.env.example` to `backend/.env`.
 | `SEED_DEMO_DATA` | `false` | Load sample streams/items on first startup |
 | `DEBUG` | `true` | Debug mode |
 | `REDIS_URL` | `redis://localhost:6379/0` | Reserved for future background jobs |
+| `GEMINI_API_KEY` | _(unset)_ | Google AI key for stream suggestions on capture (optional) |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model used for stream classification |
 
 ## Features
 
 - **Today** — daily focus list picked by the momentum engine (weekday / weekend / everyday streams)
-- **Capture** (`⌘J`) — add items to a stream manually
+- **Capture** (`⌘J`) — AI suggests which stream fits; if unclear, you pick from options, then save
 - **All Items** — view queue by stream, move items between streams/sub-streams, delete
 - **Streams** — create and manage streams and sub-streams
 - **Focus mode** — open an item, add notes, log done
@@ -87,6 +89,7 @@ All routes are prefixed with `/api`.
 | `GET` | `/items` | List items |
 | `PATCH` | `/items/{id}` | Update item (status, stream, notes, …) |
 | `DELETE` | `/items/{id}` | Delete item |
+| `POST` | `/capture/suggest-stream` | Suggest stream for new capture (AI or keyword fallback) |
 | `POST` | `/capture` | Capture content into a stream |
 
 ## Data & reset

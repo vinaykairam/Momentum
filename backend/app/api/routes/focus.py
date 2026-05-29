@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.focus import CaptureRequest, CaptureResponse, DailyFocusResponse, DashboardResponse
+from app.schemas.stream_suggestion import StreamSuggestionRequest, StreamSuggestionResponse
 from app.services.capture import capture_item
+from app.services.stream_classifier import suggest_stream_for_capture
 from app.services.momentum_engine import (
     generate_daily_focus,
     refresh_all_stream_momentum,
@@ -28,6 +30,11 @@ def get_dashboard(db: Session = Depends(get_db)) -> DashboardResponse:
     refresh_all_stream_momentum(db)
     db.commit()
     return DashboardResponse(todays_focus=generate_daily_focus(db))
+
+
+@router.post("/capture/suggest-stream", response_model=StreamSuggestionResponse)
+def suggest_stream(payload: StreamSuggestionRequest, db: Session = Depends(get_db)) -> StreamSuggestionResponse:
+    return suggest_stream_for_capture(payload.content, db)
 
 
 @router.post("/capture", response_model=CaptureResponse, status_code=201)
