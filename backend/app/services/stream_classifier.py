@@ -251,7 +251,9 @@ def suggest_stream_for_capture(content: str, db: Session) -> StreamSuggestionRes
 
     if not options:
         options = _heuristic_classify(content, contexts)
-        if not settings.gemini_api_key:
+        if options:
+            reasoning = ""
+        elif not settings.gemini_api_key:
             reasoning = "Keyword match (set GEMINI_API_KEY for smarter suggestions)."
         elif gemini_failure and "no longer available" in gemini_failure.lower():
             reasoning = (
