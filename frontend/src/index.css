@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "SF Pro Display", "Inter", system-ui, -apple-system, sans-serif;
+  --color-background: #fafafa;
+  --color-foreground: #0a0a0a;
+  --color-muted: #737373;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-accent: #2563eb;
+  --color-accent-soft: rgba(37, 99, 235, 0.08);
+  --color-glass: rgba(255, 255, 255, 0.72);
+  --color-thriving: #16a34a;
+  --color-healthy: #65a30d;
+  --color-slowing: #ca8a04;
+  --color-neglected: #ea580c;
+  --color-critical: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-background: #0a0a0a;
+    --color-foreground: #fafafa;
+    --color-muted: #a3a3a3;
+    --color-border: rgba(255, 255, 255, 0.08);
+    --color-accent: #3b82f6;
+    --color-accent-soft: rgba(59, 130, 246, 0.12);
+    --color-glass: rgba(23, 23, 23, 0.72);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+.glass {
+  background: var(--color-glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--color-border);
+}
