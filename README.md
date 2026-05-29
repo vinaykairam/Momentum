@@ -105,9 +105,10 @@ rm backend/momentum.db
 
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose).
 
-From the project root:
+From the project root (`Momentum/`, where `docker-compose.yml` lives):
 
 ```bash
+cd /path/to/Momentum
 docker compose up --build
 ```
 
