@@ -1,4 +1,5 @@
 import { MoveItemControl } from '@/components/MoveItemControl'
+import { ReorderItemControl } from '@/components/ReorderItemControl'
 import { Button } from '@/components/ui/button'
 import type { Item, Stream } from '@/lib/api'
 import { statusLabel } from '@/lib/item-queue'
@@ -8,6 +9,8 @@ interface ItemRowProps {
   item: Item
   streams: Stream[]
   queuePosition: number
+  canMoveUp: boolean
+  canMoveDown: boolean
   confirmDeleteId: number | null
   isDeleting: boolean
   onConfirmDelete: (id: number) => void
@@ -20,6 +23,8 @@ export function ItemRow({
   item,
   streams,
   queuePosition,
+  canMoveUp,
+  canMoveDown,
   confirmDeleteId,
   isDeleting,
   onConfirmDelete,
@@ -64,6 +69,12 @@ export function ItemRow({
           </div>
         ) : (
           <div className="flex items-start gap-0.5">
+            <ReorderItemControl
+              item={item}
+              canMoveUp={canMoveUp}
+              canMoveDown={canMoveDown}
+              onReordered={onMoved}
+            />
             <MoveItemControl item={item} streams={streams} onMoved={onMoved} />
             <Button
               variant="ghost"

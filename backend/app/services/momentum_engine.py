@@ -3,22 +3,12 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 
-from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.models.item import Item, ItemEffort, ItemStatus
+from app.services.item_queue import QUEUED_STATUSES, item_queue_order
 from app.models.stream import MomentumState, Stream, StreamCategory
 from app.schemas.focus import FocusRecommendation
-
-ITEM_STATUS_SORT = case(
-    (Item.status == ItemStatus.next, 0),
-    (Item.status == ItemStatus.active, 1),
-    (Item.status == ItemStatus.backlog, 2),
-    (Item.status == ItemStatus.completed, 3),
-    (Item.status == ItemStatus.archived, 4),
-    else_=5,
-)
-
 
 def _is_weekend(day: date | None = None) -> bool:
     check = day or date.today()
@@ -142,14 +132,11 @@ def update_stream_momentum(stream: Stream, db: Session) -> None:
 
 
 def _pick_action_item(stream: Stream, db: Session) -> Item | None:
-    """Oldest queued item for this stream (FIFO), matching the Items page order."""
+    """Top queued item for this stream, matching the Items page order."""
     return (
         db.query(Item)
-        .filter(
-            Item.stream_id == stream.id,
-            Item.status.in_([ItemStatus.next, ItemStatus.active, ItemStatus.backlog]),
-        )
-        .order_by(ITEM_STATUS_SORT, Item.created_at.asc(), Item.id.asc())
+        .filter(Item.stream_id == stream.id, Item.status.in_(QUEUED_STATUSES))
+        .order_by(*item_queue_order())
         .first()
     )
 

@@ -78,6 +78,7 @@ export interface Item {
   importance: string
   effort_estimate: string
   estimated_duration: number | null
+  queue_position: number
   created_at: string
   updated_at: string
   last_accessed: string | null
@@ -124,6 +125,11 @@ export const api = {
     id: number,
     payload: Partial<Pick<Item, 'status' | 'title' | 'description' | 'notes' | 'stream_id'>>,
   ) => fetchJson<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  reorderItem: (id: number, direction: 'up' | 'down') =>
+    fetchJson<Item>(`/items/${id}/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ direction }),
+    }),
   suggestStream: (content: string) =>
     fetchJson<StreamSuggestion>('/capture/suggest-stream', {
       method: 'POST',

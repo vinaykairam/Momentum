@@ -41,6 +41,7 @@ class ItemResponse(ItemBase):
 
     id: int
     stream_id: int
+    queue_position: int
     created_at: datetime
     updated_at: datetime
     last_accessed: datetime | None

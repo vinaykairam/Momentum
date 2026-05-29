@@ -120,10 +120,42 @@ def ensure_item_notes_column() -> None:
             conn.commit()
 
 
+def ensure_item_queue_position_column() -> None:
+    if not settings.database_url.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        columns = conn.execute(text("PRAGMA table_info(items)")).fetchall()
+        if not any(column[1] == "queue_position" for column in columns):
+            conn.execute(text("ALTER TABLE items ADD COLUMN queue_position INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Item)
+            .order_by(Item.stream_id, Item.status, Item.created_at.asc(), Item.id.asc())
+            .all()
+        )
+        counters: dict[tuple[int, ItemStatus], int] = {}
+        changed = False
+        for row in rows:
+            key = (row.stream_id, row.status)
+            expected = counters.get(key, 0)
+            if row.queue_position != expected:
+                row.queue_position = expected
+                changed = True
+            counters[key] = expected + 1
+        if changed:
+            db.commit()
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_item_notes_column()
+    ensure_item_queue_position_column()
     if settings.seed_demo_data:
         seed_demo_data()
     ensure_stream_descriptions()

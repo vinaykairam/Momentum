@@ -4,7 +4,8 @@ import re
 
 from sqlalchemy.orm import Session
 
-from app.models.item import Item, ItemType
+from app.models.item import Item, ItemStatus, ItemType
+from app.services.item_queue import next_queue_position
 from app.models.stream import Stream
 from app.schemas.focus import CaptureResponse
 from app.services.momentum_engine import stream_display_name
@@ -64,6 +65,7 @@ def capture_item(content: str, db: Session, stream_id: int) -> CaptureResponse:
         url=url,
         item_type=item_type,
     )
+    item.queue_position = next_queue_position(db, item.stream_id, ItemStatus.backlog)
     db.add(item)
     db.commit()
     db.refresh(item)

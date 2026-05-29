@@ -14,6 +14,7 @@ export function sortQueuedItems(items: Item[]): Item[] {
       ITEM_STATUS_ORDER.indexOf(a.status as (typeof ITEM_STATUS_ORDER)[number]) -
       ITEM_STATUS_ORDER.indexOf(b.status as (typeof ITEM_STATUS_ORDER)[number])
     if (statusDiff !== 0) return statusDiff
+    if (a.queue_position !== b.queue_position) return a.queue_position - b.queue_position
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   })
 }

@@ -39,26 +39,34 @@ function StreamQueue({
   const queuedItems = sortQueuedItems(group.items)
   const hasChildren = group.children.length > 0
 
+  const renderItemRow = (item: (typeof queuedItems)[number], index: number) => {
+    const prev = queuedItems[index - 1]
+    const next = queuedItems[index + 1]
+    return (
+      <ItemRow
+        key={item.id}
+        item={item}
+        streams={streams}
+        queuePosition={index + 1}
+        canMoveUp={index > 0 && prev.status === item.status}
+        canMoveDown={index < queuedItems.length - 1 && next.status === item.status}
+        confirmDeleteId={confirmDeleteId}
+        isDeleting={isDeleting}
+        onConfirmDelete={onConfirmDelete}
+        onCancelDelete={onCancelDelete}
+        onDelete={onDelete}
+        onMoved={onMoved}
+      />
+    )
+  }
+
   if (hasChildren) {
     return (
       <>
         {!nested && <p className="page-label pb-2 pt-5 first:pt-0">{group.stream.name}</p>}
         {queuedItems.length > 0 && (
           <div className="divide-y divide-border/40">
-            {queuedItems.map((item, index) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                streams={streams}
-                queuePosition={index + 1}
-                confirmDeleteId={confirmDeleteId}
-                isDeleting={isDeleting}
-                onConfirmDelete={onConfirmDelete}
-                onCancelDelete={onCancelDelete}
-                onDelete={onDelete}
-                onMoved={onMoved}
-              />
-            ))}
+            {queuedItems.map(renderItemRow)}
           </div>
         )}
         {group.children.map((child) => (
@@ -84,20 +92,7 @@ function StreamQueue({
     <>
       <p className={`page-label ${nested ? 'pb-2 pt-4' : 'pb-2 pt-5 first:pt-0'}`}>{group.stream.name}</p>
       <div className="divide-y divide-border/40">
-        {queuedItems.map((item, index) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            streams={streams}
-            queuePosition={index + 1}
-            confirmDeleteId={confirmDeleteId}
-            isDeleting={isDeleting}
-            onConfirmDelete={onConfirmDelete}
-            onCancelDelete={onCancelDelete}
-            onDelete={onDelete}
-            onMoved={onMoved}
-          />
-        ))}
+        {queuedItems.map(renderItemRow)}
       </div>
     </>
   )
