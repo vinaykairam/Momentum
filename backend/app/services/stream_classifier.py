@@ -12,6 +12,7 @@ from app.models.item import Item
 from app.models.stream import Stream
 from app.schemas.stream_suggestion import StreamSuggestionOption, StreamSuggestionResponse
 from app.services.momentum_engine import stream_display_name
+from app.services.url_metadata import enrich_content_with_url_context
 
 CONFIDENT_THRESHOLD = 0.78
 AMBIGUOUS_MARGIN = 0.12
@@ -236,12 +237,13 @@ def suggest_stream_for_capture(content: str, db: Session) -> StreamSuggestionRes
         )
 
     contexts = _build_stream_contexts(db, streams)
+    classification_content, _, _ = enrich_content_with_url_context(content)
     options: list[StreamSuggestionOption] = []
 
     gemini_failure: str | None = None
     if settings.gemini_api_key:
         try:
-            options = _call_gemini(content, contexts)
+            options = _call_gemini(classification_content, contexts)
         except httpx.HTTPStatusError as exc:
             gemini_failure = exc.response.text[:200] if exc.response is not None else str(exc)
             options = []
@@ -250,7 +252,7 @@ def suggest_stream_for_capture(content: str, db: Session) -> StreamSuggestionRes
             options = []
 
     if not options:
-        options = _heuristic_classify(content, contexts)
+        options = _heuristic_classify(classification_content, contexts)
         if options:
             reasoning = ""
         elif not settings.gemini_api_key:

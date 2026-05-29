@@ -9,10 +9,10 @@ from app.services.item_queue import next_queue_position
 from app.models.stream import Stream
 from app.schemas.focus import CaptureResponse
 from app.services.momentum_engine import stream_display_name
-from app.services.url_metadata import fetch_url_context
+from app.services.url_metadata import extract_url, fetch_url_context
 
 YOUTUBE_PATTERN = re.compile(r"(youtube\.com|youtu\.be)", re.I)
-URL_PATTERN = re.compile(r"https?://[^\s]+", re.I)
+URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.I)
 
 
 def _detect_item_type(content: str, url: str | None = None) -> ItemType:
@@ -33,9 +33,9 @@ def _extract_title(content: str, item_type: ItemType, url_context: str | None = 
         return url_context[:500]
 
     content = content.strip()
-    url_match = URL_PATTERN.search(content)
-    if url_match and item_type in (ItemType.youtube, ItemType.link):
-        return url_match.group(0)[:120]
+    url = extract_url(content)
+    if url and item_type in (ItemType.youtube, ItemType.link):
+        return url[:120]
 
     first_line = content.split("\n")[0].strip()
     return first_line[:500] if first_line else "Untitled capture"
@@ -51,8 +51,7 @@ def capture_item(content: str, db: Session, stream_id: int) -> CaptureResponse:
     if not target_stream:
         raise ValueError("Selected stream not found")
 
-    url_match = URL_PATTERN.search(content)
-    url = url_match.group(0) if url_match else None
+    url = extract_url(content)
     url_context = fetch_url_context(url) if url else None
 
     item_type = _detect_item_type(content, url)
