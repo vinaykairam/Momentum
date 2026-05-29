@@ -10,7 +10,8 @@ import { useEffect, useRef, useState } from 'react'
 
 const ease = [0.25, 0.1, 0.25, 1] as const
 const SUGGEST_DEBOUNCE_MS = 700
-const MIN_SUGGEST_LENGTH = 8
+/** Min trimmed length before calling suggest-stream (single words like "rowing" are allowed). */
+const MIN_SUGGEST_LENGTH = 3
 
 export function CaptureBox() {
   const open = useAppStore((s) => s.captureOpen)
@@ -197,6 +198,9 @@ export function CaptureBox() {
                 <StreamSuggestionPicker
                   suggestion={suggestion}
                   isLoading={suggesting && content.trim().length >= MIN_SUGGEST_LENGTH}
+                  waitingForMoreInput={
+                    content.trim().length > 0 && content.trim().length < MIN_SUGGEST_LENGTH
+                  }
                   selectedStreamId={streamId}
                   onSelect={handleSuggestionSelect}
                 />

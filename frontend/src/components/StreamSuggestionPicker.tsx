@@ -5,6 +5,7 @@ import { Loader2, Sparkles } from 'lucide-react'
 interface StreamSuggestionPickerProps {
   suggestion: StreamSuggestion | null
   isLoading: boolean
+  waitingForMoreInput?: boolean
   selectedStreamId: number | ''
   onSelect: (streamId: number) => void
 }
@@ -12,9 +13,14 @@ interface StreamSuggestionPickerProps {
 export function StreamSuggestionPicker({
   suggestion,
   isLoading,
+  waitingForMoreInput = false,
   selectedStreamId,
   onSelect,
 }: StreamSuggestionPickerProps) {
+  if (waitingForMoreInput) {
+    return <p className="page-meta">Keep typing for stream suggestions…</p>
+  }
+
   if (isLoading) {
     return (
       <p className="page-meta flex items-center gap-2">
