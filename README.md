@@ -101,12 +101,47 @@ rm backend/momentum.db
 # Restart backend — tables are recreated on startup
 ```
 
-## Optional: Docker services
+## Run with Docker
 
-Postgres and Redis are scaffolded but **not required** for local dev (SQLite is used by default).
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose).
+
+From the project root:
 
 ```bash
-docker compose up -d
+docker compose up --build
+```
+
+| Service | URL |
+|---------|-----|
+| **App (UI)** | http://localhost:8080 |
+| **API** | http://localhost:8000 |
+| **Health** | http://localhost:8000/health |
+
+The UI container proxies `/api` to the backend. Data is stored in a Docker volume (`momentum_data`) so it survives restarts.
+
+**Stop**
+
+```bash
+docker compose down
+```
+
+**Stop and delete data**
+
+```bash
+docker compose down -v
+```
+
+**Run in background**
+
+```bash
+docker compose up --build -d
+docker compose logs -f
+```
+
+**Optional Postgres + Redis** (not wired into the app yet):
+
+```bash
+docker compose --profile extras up -d postgres redis
 ```
 
 ## Scripts
