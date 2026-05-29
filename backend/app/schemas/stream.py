@@ -10,10 +10,11 @@ from app.models.stream import MomentumState, StreamCategory, StreamType
 class StreamBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
-    category: StreamCategory = StreamCategory.custom
+    category: StreamCategory = StreamCategory.everyday
     type: StreamType = StreamType.short_term
     priority_weight: float = Field(default=1.0, ge=0.1, le=10.0)
     active: bool = True
+    parent_id: int | None = None
 
 
 class StreamCreate(StreamBase):
@@ -27,6 +28,7 @@ class StreamUpdate(BaseModel):
     type: StreamType | None = None
     priority_weight: float | None = Field(default=None, ge=0.1, le=10.0)
     active: bool | None = None
+    parent_id: int | None = None
 
 
 class StreamResponse(StreamBase):

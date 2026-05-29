@@ -1,12 +1,62 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from collections import defaultdict
+from datetime import date
 
 from sqlalchemy.orm import Session
 
 from app.models.item import Item, ItemEffort, ItemStatus
-from app.models.stream import MomentumState, Stream
-from app.schemas.focus import FocusRecommendation, MomentumAlert
+from app.models.stream import MomentumState, Stream, StreamCategory
+from app.schemas.focus import FocusRecommendation
+
+
+def _is_weekend(day: date | None = None) -> bool:
+    check = day or date.today()
+    return check.weekday() >= 5
+
+
+def _stream_map(streams: list[Stream]) -> dict[int, Stream]:
+    return {stream.id: stream for stream in streams}
+
+
+def effective_category(stream: Stream, streams_by_id: dict[int, Stream]) -> StreamCategory:
+    if stream.parent_id and stream.parent_id in streams_by_id:
+        return streams_by_id[stream.parent_id].category
+    return stream.category
+
+
+def streams_relevant_today(streams: list[Stream], day: date | None = None) -> list[Stream]:
+    """Weekday streams Mon–Fri; weekend streams Sat–Sun; everyday streams always."""
+    streams_by_id = _stream_map(streams)
+    weekend = _is_weekend(day)
+
+    def is_relevant(category: StreamCategory) -> bool:
+        if category in (StreamCategory.everyday, StreamCategory.custom):
+            return True
+        if weekend:
+            return category == StreamCategory.weekend
+        return category == StreamCategory.weekday
+
+    return [
+        stream
+        for stream in streams
+        if is_relevant(effective_category(stream, streams_by_id))
+    ]
+
+
+def has_children(stream_id: int, streams: list[Stream]) -> bool:
+    return any(stream.parent_id == stream_id for stream in streams)
+
+
+def focusable_streams(streams: list[Stream]) -> list[Stream]:
+    """Leaf streams only — parent containers are excluded from focus."""
+    return [stream for stream in streams if not has_children(stream.id, streams)]
+
+
+def stream_display_name(stream: Stream, streams_by_id: dict[int, Stream]) -> tuple[str, str | None]:
+    if stream.parent_id and stream.parent_id in streams_by_id:
+        return stream.name, streams_by_id[stream.parent_id].name
+    return stream.name, None
 
 
 def score_to_state(score: float) -> MomentumState:
@@ -47,9 +97,38 @@ def compute_momentum_score(stream: Stream, db: Session) -> float:
     return round(score, 1)
 
 
-def update_stream_momentum(stream: Stream, db: Session) -> None:
+def _update_leaf_momentum(stream: Stream, db: Session) -> None:
     stream.momentum_score = compute_momentum_score(stream, db)
     stream.momentum_state = score_to_state(stream.momentum_score)
+
+
+def refresh_all_stream_momentum(db: Session) -> None:
+    streams = db.query(Stream).filter(Stream.active.is_(True)).all()
+    children_by_parent: dict[int, list[Stream]] = defaultdict(list)
+    for stream in streams:
+        if stream.parent_id:
+            children_by_parent[stream.parent_id].append(stream)
+
+    def update_node(stream: Stream) -> None:
+        children = children_by_parent.get(stream.id, [])
+        if children:
+            for child in children:
+                update_node(child)
+            stream.momentum_score = round(sum(child.momentum_score for child in children) / len(children), 1)
+            stream.momentum_state = score_to_state(stream.momentum_score)
+            child_dates = [child.last_activity_date for child in children if child.last_activity_date]
+            if child_dates:
+                stream.last_activity_date = max(child_dates)
+        else:
+            _update_leaf_momentum(stream, db)
+
+    for stream in streams:
+        if stream.parent_id is None:
+            update_node(stream)
+
+
+def update_stream_momentum(stream: Stream, db: Session) -> None:
+    refresh_all_stream_momentum(db)
 
 
 def _pick_action_item(stream: Stream, db: Session) -> Item | None:
@@ -85,13 +164,12 @@ def _normal_action(item: Item | None, stream: Stream) -> tuple[str, int]:
 
 def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommendation]:
     streams = db.query(Stream).filter(Stream.active.is_(True)).all()
-
-    for stream in streams:
-        update_stream_momentum(stream, db)
+    refresh_all_stream_momentum(db)
     db.commit()
 
-    # Prioritize neglected streams (lower score = higher priority)
-    sorted_streams = sorted(streams, key=lambda s: (s.momentum_score, -s.priority_weight))
+    streams_by_id = _stream_map(streams)
+    today_streams = focusable_streams(streams_relevant_today(streams))
+    sorted_streams = sorted(today_streams, key=lambda stream: (stream.momentum_score, -stream.priority_weight))
 
     recommendations: list[FocusRecommendation] = []
     for stream in sorted_streams:
@@ -100,6 +178,7 @@ def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommend
 
         item = _pick_action_item(stream, db)
         recovery = stream.momentum_score < 20
+        stream_name, parent_name = stream_display_name(stream, streams_by_id)
 
         if recovery:
             action, minutes = _recovery_action(stream, item)
@@ -109,7 +188,8 @@ def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommend
         recommendations.append(
             FocusRecommendation(
                 stream_id=stream.id,
-                stream_name=stream.name,
+                stream_name=stream_name,
+                parent_stream_name=parent_name,
                 item_id=item.id if item else None,
                 action=action,
                 estimated_minutes=minutes,
@@ -120,65 +200,3 @@ def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommend
         )
 
     return recommendations
-
-
-def generate_alerts(db: Session) -> list[MomentumAlert]:
-    streams = db.query(Stream).filter(Stream.active.is_(True)).all()
-    alerts: list[MomentumAlert] = []
-
-    for stream in streams:
-        if stream.momentum_score < 20:
-            alerts.append(
-                MomentumAlert(
-                    stream_id=stream.id,
-                    stream_name=stream.name,
-                    message=f"{stream.name} is entering critical state — high abandonment risk",
-                    severity="critical",
-                    momentum_score=stream.momentum_score,
-                )
-            )
-        elif stream.momentum_score < 40:
-            days = (date.today() - stream.last_activity_date).days if stream.last_activity_date else None
-            msg = f"{stream.name} momentum is declining"
-            if days and days >= 7:
-                msg = f"{stream.name} has not received attention in {days} days"
-            alerts.append(
-                MomentumAlert(
-                    stream_id=stream.id,
-                    stream_name=stream.name,
-                    message=msg,
-                    severity="warning",
-                    momentum_score=stream.momentum_score,
-                )
-            )
-        elif stream.momentum_score >= 80:
-            alerts.append(
-                MomentumAlert(
-                    stream_id=stream.id,
-                    stream_name=stream.name,
-                    message=f"{stream.name} momentum is improving",
-                    severity="positive",
-                    momentum_score=stream.momentum_score,
-                )
-            )
-
-    return sorted(alerts, key=lambda a: a.momentum_score)
-
-
-def get_recent_progress(db: Session, limit: int = 8) -> list[dict]:
-    items = (
-        db.query(Item)
-        .filter(Item.status == ItemStatus.completed)
-        .order_by(Item.updated_at.desc())
-        .limit(limit)
-        .all()
-    )
-    return [
-        {
-            "item_id": item.id,
-            "title": item.title,
-            "stream_id": item.stream_id,
-            "completed_at": item.updated_at.isoformat() if item.updated_at else None,
-        }
-        for item in items
-    ]

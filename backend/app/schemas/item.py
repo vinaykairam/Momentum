@@ -10,6 +10,7 @@ from app.models.item import ItemEffort, ItemImportance, ItemStatus, ItemType
 class ItemBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     description: str | None = None
+    notes: str | None = None
     url: str | None = None
     item_type: ItemType = ItemType.task
     status: ItemStatus = ItemStatus.backlog
@@ -26,6 +27,7 @@ class ItemUpdate(BaseModel):
     stream_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=500)
     description: str | None = None
+    notes: str | None = None
     url: str | None = None
     item_type: ItemType | None = None
     status: ItemStatus | None = None

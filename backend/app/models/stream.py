@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, Float, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -11,7 +11,8 @@ from app.core.database import Base
 class StreamCategory(str, enum.Enum):
     weekday = "weekday"
     weekend = "weekend"
-    custom = "custom"
+    everyday = "everyday"
+    custom = "custom"  # legacy; treated like everyday
 
 
 class StreamType(str, enum.Enum):
@@ -31,6 +32,9 @@ class Stream(Base):
     __tablename__ = "streams"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("streams.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     category: Mapped[StreamCategory] = mapped_column(
@@ -52,3 +56,5 @@ class Stream(Base):
     )
 
     items = relationship("Item", back_populates="stream", cascade="all, delete-orphan")
+    parent = relationship("Stream", remote_side="Stream.id", back_populates="children")
+    children = relationship("Stream", back_populates="parent", cascade="all, delete-orphan")

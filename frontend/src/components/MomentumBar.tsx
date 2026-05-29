@@ -1,17 +1,18 @@
-import { momentumBarColor } from '@/lib/utils'
+import { cn, momentumBarColor } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 interface MomentumBarProps {
   score: number
   state: string
   name: string
+  nested?: boolean
 }
 
-export function MomentumBar({ score, state, name }: MomentumBarProps) {
+export function MomentumBar({ score, state, name, nested }: MomentumBarProps) {
   return (
-    <div className="space-y-2">
+    <div className={cn('space-y-2', nested && 'opacity-90')}>
       <div className="flex items-baseline justify-between gap-4">
-        <span className="text-sm font-medium">{name}</span>
+        <span className={cn('font-medium', nested ? 'text-xs text-muted' : 'text-sm')}>{name}</span>
         <span className="tabular-nums text-sm text-muted">{Math.round(score)}</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/5">

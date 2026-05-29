@@ -52,6 +52,7 @@ class Item(Base):
     stream_id: Mapped[int] = mapped_column(ForeignKey("streams.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     item_type: Mapped[ItemType] = mapped_column(Enum(ItemType, name="item_type"), nullable=False, default=ItemType.task)
     status: Mapped[ItemStatus] = mapped_column(

@@ -6,13 +6,44 @@ from datetime import date, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import text
+
 from app.api.routes import focus, items, streams
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 from app.models import Item, Stream
 from app.models.item import ItemEffort, ItemImportance, ItemStatus, ItemType
 from app.models.stream import StreamCategory, StreamType
-from app.services.momentum_engine import update_stream_momentum
+from app.services.momentum_engine import refresh_all_stream_momentum
+from app.services.stream_constants import DEFAULT_STREAM_DESCRIPTIONS, WORKOUT_SUB_STREAMS
+
+
+def _create_workout_sub_streams(db, workout: Stream, today: date) -> list[Stream]:
+    sub_streams = []
+    for index, name in enumerate(WORKOUT_SUB_STREAMS):
+        sub_stream = Stream(
+            name=name,
+            parent_id=workout.id,
+            category=workout.category,
+            type=workout.type,
+            priority_weight=workout.priority_weight,
+            description=DEFAULT_STREAM_DESCRIPTIONS.get(name),
+            last_activity_date=today - timedelta(days=index + 1),
+        )
+        db.add(sub_stream)
+        sub_streams.append(sub_stream)
+    return sub_streams
+
+
+def ensure_stream_descriptions() -> None:
+    db = SessionLocal()
+    try:
+        for stream in db.query(Stream).all():
+            if not stream.description and stream.name in DEFAULT_STREAM_DESCRIPTIONS:
+                stream.description = DEFAULT_STREAM_DESCRIPTIONS[stream.name]
+        db.commit()
+    finally:
+        db.close()
 
 
 def seed_demo_data() -> None:
@@ -22,53 +53,42 @@ def seed_demo_data() -> None:
             return
 
         today = date.today()
-        demo_streams = [
-            Stream(
-                name="Work",
-                category=StreamCategory.weekday,
-                type=StreamType.short_term,
-                priority_weight=1.2,
-                last_activity_date=today,
-            ),
-            Stream(
-                name="Workout",
-                category=StreamCategory.weekday,
-                type=StreamType.short_term,
-                priority_weight=1.0,
-                last_activity_date=today - timedelta(days=1),
-            ),
-            Stream(
-                name="Study",
-                category=StreamCategory.weekday,
-                type=StreamType.long_term,
-                priority_weight=1.1,
-                last_activity_date=today - timedelta(days=5),
-            ),
-            Stream(
-                name="Garage Projects",
-                category=StreamCategory.weekend,
-                type=StreamType.long_term,
-                priority_weight=0.9,
-                last_activity_date=today - timedelta(days=24),
-            ),
-            Stream(
-                name="Long-Term Projects",
-                category=StreamCategory.custom,
-                type=StreamType.long_term,
-                priority_weight=1.0,
-                last_activity_date=today - timedelta(days=30),
-            ),
-        ]
-        for s in demo_streams:
-            db.add(s)
+        workout = Stream(
+            name="Workout",
+            description=DEFAULT_STREAM_DESCRIPTIONS["Workout"],
+            category=StreamCategory.weekday,
+            type=StreamType.short_term,
+            priority_weight=1.0,
+        )
+        study = Stream(
+            name="Study",
+            description=DEFAULT_STREAM_DESCRIPTIONS["Study"],
+            category=StreamCategory.weekday,
+            type=StreamType.long_term,
+            priority_weight=1.1,
+            last_activity_date=today - timedelta(days=5),
+        )
+        garage = Stream(
+            name="Garage Projects",
+            description=DEFAULT_STREAM_DESCRIPTIONS["Garage Projects"],
+            category=StreamCategory.weekend,
+            type=StreamType.long_term,
+            priority_weight=0.9,
+            last_activity_date=today - timedelta(days=24),
+        )
+        db.add(workout)
+        db.add(study)
+        db.add(garage)
+        db.flush()
+
+        cardio, strong_lifts = _create_workout_sub_streams(db, workout, today)
         db.flush()
 
         demo_items = [
-            (demo_streams[0], "Finish Architecture Review", ItemType.task, ItemStatus.next, 45),
-            (demo_streams[1], "Upper Body Session", ItemType.task, ItemStatus.next, 60),
-            (demo_streams[2], "Watch Kubernetes Lesson", ItemType.youtube, ItemStatus.next, 30),
-            (demo_streams[3], "Welding Cart — Install Wheels", ItemType.project, ItemStatus.active, 45),
-            (demo_streams[4], "Side Business MVP Planning", ItemType.project, ItemStatus.backlog, 90),
+            (cardio, "30 Minute Run", ItemType.task, ItemStatus.next, 30),
+            (strong_lifts, "Squat / Bench / Rows", ItemType.task, ItemStatus.next, 60),
+            (study, "Watch Kubernetes Lesson", ItemType.youtube, ItemStatus.next, 30),
+            (garage, "Welding Cart — Install Wheels", ItemType.project, ItemStatus.active, 45),
         ]
         for stream, title, itype, status, duration in demo_items:
             db.add(
@@ -83,18 +103,30 @@ def seed_demo_data() -> None:
                 )
             )
 
-        for stream in demo_streams:
-            update_stream_momentum(stream, db)
+        refresh_all_stream_momentum(db)
 
         db.commit()
     finally:
         db.close()
 
 
+def ensure_item_notes_column() -> None:
+    if not settings.database_url.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        columns = conn.execute(text("PRAGMA table_info(items)")).fetchall()
+        if not any(column[1] == "notes" for column in columns):
+            conn.execute(text("ALTER TABLE items ADD COLUMN notes TEXT"))
+            conn.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    seed_demo_data()
+    ensure_item_notes_column()
+    if settings.seed_demo_data:
+        seed_demo_data()
+    ensure_stream_descriptions()
     yield
 
 

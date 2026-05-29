@@ -11,5 +11,4 @@ python-multipart>=0.0.17
 redis>=5.2.0
 celery>=5.4.0
 httpx>=0.28.0
-openai>=1.57.0
 eval_type_backport>=0.2.0

@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button'
+import { StreamSelect } from '@/components/StreamSelect'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/store/app'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2, Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -10,15 +11,24 @@ export function CaptureBox() {
   const open = useAppStore((s) => s.captureOpen)
   const setOpen = useAppStore((s) => s.setCaptureOpen)
   const [content, setContent] = useState('')
+  const [streamId, setStreamId] = useState<number | ''>('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const queryClient = useQueryClient()
 
+  const { data: streams = [] } = useQuery({
+    queryKey: ['streams'],
+    queryFn: api.getStreams,
+    enabled: open,
+  })
+
   const mutation = useMutation({
-    mutationFn: (text: string) => api.capture(text),
+    mutationFn: ({ text, stream }: { text: string; stream: number }) => api.capture(text, stream),
     onSuccess: () => {
       setContent('')
+      setStreamId('')
       setOpen(false)
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['items'] })
     },
   })
 
@@ -40,6 +50,16 @@ export function CaptureBox() {
     return () => window.removeEventListener('keydown', handler)
   }, [setOpen])
 
+  const canCapture = content.trim().length > 0 && streamId !== ''
+
+  const handleCapture = () => {
+    if (!canCapture) return
+    mutation.mutate({
+      text: content.trim(),
+      stream: streamId as number,
+    })
+  }
+
   return (
     <>
       <Button variant="ghost" size="sm" onClick={() => setOpen(true)} className="gap-1.5 text-muted">
@@ -54,7 +74,7 @@ export function CaptureBox() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 p-4 pt-[15vh] backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 p-4 pt-[12vh] backdrop-blur-sm"
             onClick={() => setOpen(false)}
           >
             <motion.div
@@ -70,6 +90,7 @@ export function CaptureBox() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
+
               <textarea
                 ref={inputRef}
                 value={content}
@@ -78,24 +99,36 @@ export function CaptureBox() {
                 rows={4}
                 className="w-full resize-none rounded-xl border border-border bg-transparent p-4 text-base outline-none placeholder:text-muted/60 focus:ring-2 focus:ring-accent/30"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && content.trim()) {
-                    mutation.mutate(content.trim())
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCapture) {
+                    handleCapture()
                   }
                 }}
               />
+
+              <div className="mt-4 space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted">Stream</label>
+                <StreamSelect
+                  streams={streams}
+                  value={streamId}
+                  onChange={setStreamId}
+                  disabled={mutation.isPending}
+                />
+                <p className="text-xs text-muted">Choose which stream this item belongs to</p>
+              </div>
+
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs text-muted">AI will classify and assign to a stream</span>
-                <Button
-                  variant="accent"
-                  disabled={!content.trim() || mutation.isPending}
-                  onClick={() => mutation.mutate(content.trim())}
-                >
+                <span className="text-xs text-muted">⌘↵ to capture</span>
+                <Button variant="accent" disabled={!canCapture || mutation.isPending} onClick={handleCapture}>
                   {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Capture'}
                 </Button>
               </div>
+
               {mutation.isSuccess && (
-                <p className="mt-3 text-sm text-thriving">
-                  Saved to {mutation.data.suggested_stream_name} ({Math.round(mutation.data.confidence * 100)}% confidence)
+                <p className="mt-3 text-sm text-thriving">Saved to {mutation.data.stream_name}</p>
+              )}
+              {mutation.isError && (
+                <p className="mt-3 text-sm text-critical">
+                  {mutation.error instanceof Error ? mutation.error.message : 'Could not capture.'}
                 </p>
               )}
             </motion.div>

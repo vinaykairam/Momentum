@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./momentum.db"
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-production"
-    openai_api_key: str = ""
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    seed_demo_data: bool = False
 
 
 settings = Settings()
