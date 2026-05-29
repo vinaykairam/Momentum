@@ -141,18 +141,6 @@ def update_stream_momentum(stream: Stream, db: Session) -> None:
     refresh_all_stream_momentum(db)
 
 
-def _pick_action_item(stream: Stream, db: Session) -> Item | None:
-    return (
-        db.query(Item)
-        .filter(
-            Item.stream_id == stream.id,
-            Item.status.in_([ItemStatus.next, ItemStatus.active, ItemStatus.backlog]),
-        )
-        .order_by(ITEM_STATUS_SORT, Item.created_at.asc(), Item.id.asc())
-        .first()
-    )
-
-
 def _recovery_action(stream: Stream, item: Item | None) -> tuple[str, int]:
     if item and item.effort_estimate == ItemEffort.tiny:
         return item.title, item.estimated_duration or 15
@@ -173,20 +161,30 @@ def _normal_action(item: Item | None, stream: Stream) -> tuple[str, int]:
 
 
 def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommendation]:
+    """Build today's list as a FIFO queue of queued items (oldest first)."""
     streams = db.query(Stream).filter(Stream.active.is_(True)).all()
     refresh_all_stream_momentum(db)
     db.commit()
 
     streams_by_id = _stream_map(streams)
-    today_streams = focusable_streams(streams_relevant_today(streams))
-    sorted_streams = sorted(today_streams, key=lambda stream: (stream.momentum_score, -stream.priority_weight))
+    today_stream_ids = {stream.id for stream in focusable_streams(streams_relevant_today(streams))}
+    if not today_stream_ids:
+        return []
+
+    queued_items = (
+        db.query(Item)
+        .filter(
+            Item.stream_id.in_(today_stream_ids),
+            Item.status.in_([ItemStatus.next, ItemStatus.active, ItemStatus.backlog]),
+        )
+        .order_by(ITEM_STATUS_SORT, Item.created_at.asc(), Item.id.asc())
+        .limit(max_items)
+        .all()
+    )
 
     recommendations: list[FocusRecommendation] = []
-    for stream in sorted_streams:
-        if len(recommendations) >= max_items:
-            break
-
-        item = _pick_action_item(stream, db)
+    for item in queued_items:
+        stream = streams_by_id[item.stream_id]
         recovery = stream.momentum_score < 20
         stream_name, parent_name = stream_display_name(stream, streams_by_id)
 
@@ -200,7 +198,7 @@ def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommend
                 stream_id=stream.id,
                 stream_name=stream_name,
                 parent_stream_name=parent_name,
-                item_id=item.id if item else None,
+                item_id=item.id,
                 action=action,
                 estimated_minutes=minutes,
                 momentum_score=stream.momentum_score,
