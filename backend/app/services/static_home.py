@@ -7,7 +7,7 @@ from app.schemas.focus import FocusRecommendation
 EINK_STYLES = """
 :root {
   color-scheme: light;
-  --eink-scale: 1.5;
+  --eink-scale: 1.25;
   --background: #fafafa;
   --foreground: #0a0a0a;
   --muted: #737373;
