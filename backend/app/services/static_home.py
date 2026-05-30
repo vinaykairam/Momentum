@@ -32,18 +32,41 @@ main {
   padding: 3rem 1.5rem 4rem;
 }
 
-h1 {
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin: 0 0 3.5rem;
-  font-size: 1.875rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 3.75rem;
   font-weight: 400;
   letter-spacing: -0.025em;
   line-height: 1.2;
 }
 
+.reload-link {
+  font-size: 2rem;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.75rem 0;
+  min-height: 3rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.reload-link:active {
+  color: var(--foreground);
+}
+
 .empty-state {
   padding: 4rem 0;
   text-align: center;
-  font-size: 1.25rem;
+  font-size: 2.5rem;
   color: var(--muted);
 }
 
@@ -64,7 +87,7 @@ h1 {
 .stream-group-title {
   margin: 0 0 1.25rem;
   padding: 0 0.5rem;
-  font-size: 1rem;
+  font-size: 2rem;
   font-weight: 400;
   color: var(--muted);
   letter-spacing: 0.02em;
@@ -90,14 +113,14 @@ h1 {
 
 .focus-stream {
   display: block;
-  font-size: 1rem;
+  font-size: 2rem;
   color: var(--muted);
 }
 
 .focus-action {
   display: block;
   margin-top: 0.375rem;
-  font-size: 1.25rem;
+  font-size: 2.5rem;
   line-height: 1.5;
   letter-spacing: -0.015em;
 }
@@ -180,7 +203,10 @@ def render_today_page(focus: list[FocusRecommendation]) -> str:
   </head>
   <body>
     <main>
-      <h1>Today</h1>
+      <header class="page-header">
+        <h1>Today</h1>
+        <a class="reload-link" href="/eink">Reload page</a>
+      </header>
       {body}
     </main>
   </body>
