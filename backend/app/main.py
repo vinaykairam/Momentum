@@ -3,18 +3,21 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
 from sqlalchemy import text
 
 from app.api.routes import focus, items, streams
 from app.core.config import settings
-from app.core.database import Base, SessionLocal, engine
+from app.core.database import Base, SessionLocal, engine, get_db
 from app.models import Item, Stream
 from app.models.item import ItemEffort, ItemImportance, ItemStatus, ItemType
 from app.models.stream import StreamCategory, StreamType
-from app.services.momentum_engine import refresh_all_stream_momentum
+from app.services.momentum_engine import generate_daily_focus, refresh_all_stream_momentum
+from app.services.static_home import render_today_page
 from app.services.stream_constants import DEFAULT_STREAM_DESCRIPTIONS, WORKOUT_SUB_STREAMS
 
 
@@ -180,3 +183,11 @@ app.include_router(focus.router, prefix="/api")
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "app": settings.app_name}
+
+
+@app.get("/eink", response_class=HTMLResponse)
+def eink_home(db: Session = Depends(get_db)) -> HTMLResponse:
+    refresh_all_stream_momentum(db)
+    db.commit()
+    focus = generate_daily_focus(db)
+    return HTMLResponse(content=render_today_page(focus))
