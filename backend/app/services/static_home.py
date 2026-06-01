@@ -7,7 +7,7 @@ from app.schemas.focus import FocusRecommendation
 EINK_STYLES = """
 :root {
   color-scheme: light;
-  --eink-scale: 1.25;
+  --eink-scale: 2.5;
   --background: #fafafa;
   --foreground: #0a0a0a;
   --muted: #737373;
@@ -28,9 +28,10 @@ body {
 }
 
 main {
-  max-width: 42rem;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 3rem 1.5rem 4rem;
+  padding: calc(2rem * var(--eink-scale)) calc(1.25rem * var(--eink-scale))
+    calc(2.5rem * var(--eink-scale));
 }
 
 .page-header {
@@ -67,7 +68,7 @@ h1 {
 .empty-state {
   padding: 4rem 0;
   text-align: center;
-  font-size: calc(1.25rem * var(--eink-scale));
+  font-size: calc(1.5rem * var(--eink-scale));
   color: var(--muted);
 }
 
@@ -88,7 +89,7 @@ h1 {
 .stream-group-title {
   margin: 0 0 1.25rem;
   padding: 0 0.5rem;
-  font-size: calc(1rem * var(--eink-scale));
+  font-size: calc(1.125rem * var(--eink-scale));
   font-weight: 400;
   color: var(--muted);
   letter-spacing: 0.02em;
@@ -114,16 +115,18 @@ h1 {
 
 .focus-stream {
   display: block;
-  font-size: calc(1rem * var(--eink-scale));
+  font-size: calc(1.125rem * var(--eink-scale));
   color: var(--muted);
+  line-height: 1.35;
 }
 
 .focus-action {
   display: block;
-  margin-top: 0.375rem;
-  font-size: calc(1.25rem * var(--eink-scale));
-  line-height: 1.5;
-  letter-spacing: -0.015em;
+  margin-top: 0.5rem;
+  font-size: calc(1.5rem * var(--eink-scale));
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 """
 
