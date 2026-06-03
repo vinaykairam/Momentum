@@ -65,7 +65,7 @@ Copy `backend/.env.example` to `backend/.env`.
 | `DEBUG` | `true` | Debug mode |
 | `REDIS_URL` | `redis://localhost:6379/0` | Reserved for future background jobs |
 | `GEMINI_API_KEY` | _(unset)_ | Google AI key for stream suggestions on capture (optional) |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model used for stream classification |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | Gemini model used for stream classification |
 
 ## Features
 

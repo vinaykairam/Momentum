@@ -260,7 +260,7 @@ def suggest_stream_for_capture(content: str, db: Session) -> StreamSuggestionRes
         elif gemini_failure and "no longer available" in gemini_failure.lower():
             reasoning = (
                 f"Model {settings.gemini_model!r} is retired for your API key. "
-                "Set GEMINI_MODEL=gemini-2.5-flash in backend/.env and restart."
+                "Set GEMINI_MODEL=gemini-3.5-flash in backend/.env and restart."
             )
         else:
             reasoning = "AI suggestion failed; using keyword match."
