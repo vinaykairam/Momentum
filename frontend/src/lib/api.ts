@@ -84,6 +84,19 @@ export interface Item {
   last_accessed: string | null
 }
 
+export interface UpdateItemPayload {
+  stream_id?: number
+  title?: string
+  description?: string | null
+  notes?: string | null
+  url?: string | null
+  item_type?: string
+  status?: string
+  importance?: string
+  effort_estimate?: string
+  estimated_duration?: number | null
+}
+
 const API_BASE = '/api'
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -121,10 +134,8 @@ export const api = {
   deleteStream: (id: number) => fetchJson<void>(`/streams/${id}`, { method: 'DELETE' }),
   deleteItem: (id: number) => fetchJson<void>(`/items/${id}`, { method: 'DELETE' }),
   getItem: (id: number) => fetchJson<Item>(`/items/${id}`),
-  updateItem: (
-    id: number,
-    payload: Partial<Pick<Item, 'status' | 'title' | 'description' | 'notes' | 'stream_id'>>,
-  ) => fetchJson<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  updateItem: (id: number, payload: UpdateItemPayload) =>
+    fetchJson<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   reorderItem: (id: number, direction: 'up' | 'down') =>
     fetchJson<Item>(`/items/${id}/reorder`, {
       method: 'POST',

@@ -1,9 +1,10 @@
+import { EditItemForm } from '@/components/EditItemForm'
 import { MoveItemControl } from '@/components/MoveItemControl'
 import { ReorderItemControl } from '@/components/ReorderItemControl'
 import { Button } from '@/components/ui/button'
 import type { Item, Stream } from '@/lib/api'
 import { statusLabel } from '@/lib/item-queue'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, Pencil, Trash2 } from 'lucide-react'
 
 interface ItemRowProps {
   item: Item
@@ -17,6 +18,10 @@ interface ItemRowProps {
   onCancelDelete: () => void
   onDelete: (id: number) => void
   onMoved: () => void
+  editingItemId: number | null
+  onEdit: (id: number) => void
+  onCancelEdit: () => void
+  onSaved: () => void
 }
 
 export function ItemRow({
@@ -31,7 +36,19 @@ export function ItemRow({
   onCancelDelete,
   onDelete,
   onMoved,
+  editingItemId,
+  onEdit,
+  onCancelEdit,
+  onSaved,
 }: ItemRowProps) {
+  if (editingItemId === item.id) {
+    return (
+      <div className="py-5 md:py-6">
+        <EditItemForm item={item} streams={streams} onCancel={onCancelEdit} onSuccess={onSaved} />
+      </div>
+    )
+  }
+
   return (
     <div className="group flex items-start justify-between gap-4 py-5 md:py-6">
       <div className="min-w-0 flex-1">
@@ -76,6 +93,15 @@ export function ItemRow({
               onReordered={onMoved}
             />
             <MoveItemControl item={item} streams={streams} onMoved={onMoved} />
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={() => onEdit(item.id)}
+              className="text-muted opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+              aria-label={`Edit ${item.title}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="md"

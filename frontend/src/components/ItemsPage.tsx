@@ -90,6 +90,10 @@ function StreamQueue({
   onCancelDelete,
   onDelete,
   onMoved,
+  editingItemId,
+  onEdit,
+  onCancelEdit,
+  onSaved,
 }: {
   group: StreamItemGroup
   streams: Stream[]
@@ -100,6 +104,10 @@ function StreamQueue({
   onCancelDelete: () => void
   onDelete: (id: number) => void
   onMoved: () => void
+  editingItemId: number | null
+  onEdit: (id: number) => void
+  onCancelEdit: () => void
+  onSaved: () => void
 }) {
   const queuedItems = sortQueuedItems(group.items)
   const hasChildren = group.children.length > 0
@@ -121,6 +129,10 @@ function StreamQueue({
         onCancelDelete={onCancelDelete}
         onDelete={onDelete}
         onMoved={onMoved}
+        editingItemId={editingItemId}
+        onEdit={onEdit}
+        onCancelEdit={onCancelEdit}
+        onSaved={onSaved}
       />
     )
   }
@@ -150,6 +162,10 @@ function StreamQueue({
                 onCancelDelete={onCancelDelete}
                 onDelete={onDelete}
                 onMoved={onMoved}
+                editingItemId={editingItemId}
+                onEdit={onEdit}
+                onCancelEdit={onCancelEdit}
+                onSaved={onSaved}
               />
             ))}
           </div>
@@ -168,6 +184,7 @@ function StreamQueue({
 export function ItemsPage({ onBack }: ItemsPageProps) {
   const queryClient = useQueryClient()
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [editingItemId, setEditingItemId] = useState<number | null>(null)
 
   const { data: items, isLoading, error } = useQuery({
     queryKey: ['items'],
@@ -195,7 +212,7 @@ export function ItemsPage({ onBack }: ItemsPageProps) {
     },
   })
 
-  const invalidateAfterMove = () => {
+  const invalidateItems = () => {
     queryClient.invalidateQueries({ queryKey: ['items'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
@@ -217,10 +234,23 @@ export function ItemsPage({ onBack }: ItemsPageProps) {
     streams,
     confirmDeleteId,
     isDeleting: deleteMutation.isPending,
-    onConfirmDelete: setConfirmDeleteId,
+    onConfirmDelete: (id: number) => {
+      setEditingItemId(null)
+      setConfirmDeleteId(id)
+    },
     onCancelDelete: () => setConfirmDeleteId(null),
     onDelete: (id: number) => deleteMutation.mutate(id),
-    onMoved: invalidateAfterMove,
+    onMoved: invalidateItems,
+    editingItemId,
+    onEdit: (id: number) => {
+      setConfirmDeleteId(null)
+      setEditingItemId(id)
+    },
+    onCancelEdit: () => setEditingItemId(null),
+    onSaved: () => {
+      setEditingItemId(null)
+      invalidateItems()
+    },
   }
 
   return (
