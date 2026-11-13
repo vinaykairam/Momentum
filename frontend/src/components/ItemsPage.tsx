@@ -2,13 +2,13 @@ import { CaptureBox } from '@/components/CaptureBox'
 import { ItemRow } from '@/components/ItemRow'
 import { PageLoading, PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
-import { api, type Stream } from '@/lib/api'
+import { api, ITEMS_CSV_URL, type Stream } from '@/lib/api'
 import { filterQueuedItems, sortQueuedItems } from '@/lib/item-queue'
 import { groupItemsByStreamTree, type StreamItemGroup } from '@/lib/stream-tree'
 import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Download } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 
 interface ItemsPageProps {
@@ -258,7 +258,21 @@ export function ItemsPage({ onBack }: ItemsPageProps) {
       title="All Items"
       subtitle={`${activeItems.length} queued`}
       onBack={onBack}
-      actions={<CaptureBox />}
+      actions={
+        <>
+          <a
+            href={ITEMS_CSV_URL}
+            download
+            title="Download all items as CSV"
+            aria-label="Download all items as CSV"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl px-3 text-base transition-all duration-200 hover:bg-black/5 active:scale-[0.98] dark:hover:bg-white/5"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            <span>CSV</span>
+          </a>
+          <CaptureBox />
+        </>
+      }
     >
       {groupedItems.length === 0 ? (
         <p className="page-body py-16 text-center text-muted">No items yet. Use Capture to add something.</p>

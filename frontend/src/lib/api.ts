@@ -122,6 +122,8 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
+export const ITEMS_CSV_URL = `${API_BASE}/items/export.csv`
+
 export const api = {
   getDashboard: () => fetchJson<Dashboard>('/dashboard'),
   getTodaysFocus: () => fetchJson<{ recommendations: FocusRecommendation[] }>('/focus/today'),

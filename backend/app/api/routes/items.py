@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -25,6 +27,72 @@ def list_items(
     if stream_id is not None:
         query = query.filter(Item.stream_id == stream_id)
     return query.order_by(*item_queue_order()).all()
+
+
+CSV_COLUMNS = [
+    "id",
+    "title",
+    "stream",
+    "status",
+    "item_type",
+    "importance",
+    "effort_estimate",
+    "estimated_duration",
+    "queue_position",
+    "url",
+    "description",
+    "notes",
+    "created_at",
+    "updated_at",
+    "last_accessed",
+]
+
+
+def _csv_value(value: object) -> object:
+    if value is None:
+        return ""
+    if hasattr(value, "value"):
+        return value.value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+@router.get("/export.csv")
+def export_items_csv(db: Session = Depends(get_db)) -> Response:
+    streams = {stream.id: stream for stream in db.query(Stream).all()}
+
+    def stream_path(stream_id: int) -> str:
+        names: list[str] = []
+        seen: set[int] = set()
+        current = streams.get(stream_id)
+        while current is not None and current.id not in seen:
+            seen.add(current.id)
+            names.append(current.name)
+            current = streams.get(current.parent_id) if current.parent_id else None
+        return " / ".join(reversed(names))
+
+    items = db.query(Item).order_by(Item.stream_id, *item_queue_order()).all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(CSV_COLUMNS)
+    for item in items:
+        row = []
+        for column in CSV_COLUMNS:
+            if column == "stream":
+                row.append(stream_path(item.stream_id))
+            else:
+                row.append(_csv_value(getattr(item, column)))
+        writer.writerow(row)
+
+    filename = f"momentum-items-{datetime.now(timezone.utc).date().isoformat()}.csv"
+    # BOM so Excel opens UTF-8 correctly
+    return Response(
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
