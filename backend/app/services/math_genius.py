@@ -138,13 +138,20 @@ def _generate_lesson_text(number: int, topic: str) -> str | None:
         + (f"Recent lessons covered: {', '.join(previous)}.\n" if previous else "")
         + "\nStructure the lesson with these sections, in plain text (no markdown symbols like # or *), "
         "each starting with its name in capitals on its own line:\n"
-        "THE IDEA - explain the concept simply and intuitively, building on earlier lessons.\n"
+        "THE STORY - open with the human story behind this idea, told like a gripping short story: "
+        "who discovered or developed it, when and where, what real problem they were stuck on "
+        "(trade, astronomy, navigation, war, taxes, gambling and so on), why the old way was painful, "
+        "and how this idea changed things. For ideas with no single inventor (like counting), tell "
+        "the story of the civilizations that shaped it. Stick to well-documented history: no invented "
+        "quotes or dialogue, and say 'legend has it' for anything uncertain.\n"
+        "THE IDEA - explain the concept simply and intuitively as the answer to the problem in the "
+        "story, building on earlier lessons.\n"
         "WORKED EXAMPLE - one example solved step by step.\n"
         "REAL WORLD - 2 or 3 concrete, practical situations where this is actually used "
         "(money, cooking, building, games, science, tech, sports and so on), with numbers.\n"
         "PRACTICE - exactly 2 practice questions, at least one set in a real-world scenario.\n"
         "ANSWERS - the answers to the 2 practice questions with a one-line explanation each.\n"
-        "\nKeep it focused: around 300 to 450 words."
+        "\nKeep it focused: around 500 to 700 words, with the story taking about a third."
     )
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
     try:
