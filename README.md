@@ -64,8 +64,8 @@ Copy `backend/.env.example` to `backend/.env`.
 | `SEED_DEMO_DATA` | `false` | Load sample streams/items on first startup |
 | `DEBUG` | `true` | Debug mode |
 | `REDIS_URL` | `redis://localhost:6379/0` | Reserved for future background jobs |
-| `ANTHROPIC_API_KEY` | _(unset)_ | Anthropic API key for stream suggestions on capture (optional) |
-| `ANTHROPIC_MODEL` | `claude-opus-5-5` | Claude model used for stream classification |
+| `GEMINI_API_KEY` | _(unset)_ | Google AI key for stream suggestions on capture (optional) |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | Gemini model used for stream classification |
 
 ## Features
 

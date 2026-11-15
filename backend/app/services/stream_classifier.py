@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 
-import anthropic
+import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -114,64 +114,55 @@ def _heuristic_classify(content: str, contexts: list[_StreamContext]) -> list[St
     ]
 
 
-_RANKINGS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "rankings": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "stream_id": {"type": "integer"},
-                    "confidence": {"type": "number"},
-                    "reason": {"type": "string"},
-                },
-                "required": ["stream_id", "confidence", "reason"],
-                "additionalProperties": False,
-            },
-        }
-    },
-    "required": ["rankings"],
-    "additionalProperties": False,
-}
-
-_SYSTEM_PROMPT = (
-    "You classify captured tasks into life streams. "
-    "For each stream that plausibly fits the capture, return its stream_id, a confidence "
-    "between 0 and 1, and a short reason (one sentence). "
-    "Use only stream ids from the catalog. Prefer sub-streams over parents when both fit. "
-    "Order rankings by confidence descending."
-)
+def _parse_llm_json(raw: str) -> dict:
+    text = raw.strip()
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+    if fence:
+        text = fence.group(1).strip()
+    return json.loads(text)
 
 
-def _call_claude(content: str, contexts: list[_StreamContext]) -> list[StreamSuggestionOption]:
-    if not settings.anthropic_api_key:
+def _call_gemini(content: str, contexts: list[_StreamContext]) -> list[StreamSuggestionOption]:
+    if not settings.gemini_api_key:
         return []
 
     valid_ids = {ctx.stream_id for ctx in contexts}
-    user = f"Streams catalog:\n\n{_format_streams_for_prompt(contexts)}\n\nCapture:\n{content.strip()}"
-
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key, timeout=30.0, max_retries=1)
-    response = client.beta.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=4096,
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user}],
-        output_config={
-            "effort": "low",
-            "format": {"type": "json_schema", "schema": _RANKINGS_SCHEMA},
-        },
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
+    system = (
+        "You classify captured tasks into life streams. "
+        "Return JSON only with shape: "
+        '{"rankings":[{"stream_id":number,"confidence":0-1,"reason":"short"}]}. '
+        "Use only stream ids from the catalog. Prefer sub-streams over parents when both fit. "
+        "Order rankings by confidence descending."
     )
+    user = f"Streams catalog:\n\n{_format_streams_for_prompt(contexts)}\n\nCapture:\n{content.strip()}"
+    model = settings.gemini_model
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-    if response.stop_reason in ("refusal", "max_tokens"):
-        raise ValueError(f"Claude stopped early: {response.stop_reason}")
+    with httpx.Client(timeout=30.0) as client:
+        response = client.post(
+            url,
+            params={"key": settings.gemini_api_key},
+            headers={"Content-Type": "application/json"},
+            json={
+                "systemInstruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "responseMimeType": "application/json",
+                },
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
 
-    message = next((b.text for b in response.content if b.type == "text"), "")
-    if not message:
+    candidates = payload.get("candidates") or []
+    if not candidates:
         return []
-    parsed = json.loads(message)
+    parts = candidates[0].get("content", {}).get("parts") or []
+    if not parts:
+        return []
+    message = parts[0].get("text", "")
+    parsed = _parse_llm_json(message)
     rankings = parsed.get("rankings", [])
     options: list[StreamSuggestionOption] = []
     labels = {ctx.stream_id: ctx.label for ctx in contexts}
@@ -249,32 +240,27 @@ def suggest_stream_for_capture(content: str, db: Session) -> StreamSuggestionRes
     classification_content, _, _ = enrich_content_with_url_context(content)
     options: list[StreamSuggestionOption] = []
 
-    llm_failure: str | None = None
-    model_not_found = False
-    if settings.anthropic_api_key:
+    gemini_failure: str | None = None
+    if settings.gemini_api_key:
         try:
-            options = _call_claude(classification_content, contexts)
-        except anthropic.NotFoundError as exc:
-            model_not_found = True
-            llm_failure = str(exc)
+            options = _call_gemini(classification_content, contexts)
+        except httpx.HTTPStatusError as exc:
+            gemini_failure = exc.response.text[:200] if exc.response is not None else str(exc)
             options = []
-        except anthropic.APIStatusError as exc:
-            llm_failure = f"{exc.status_code}: {exc.message}"[:200]
-            options = []
-        except (anthropic.APIConnectionError, json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
-            llm_failure = str(exc)
+        except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
+            gemini_failure = str(exc)
             options = []
 
     if not options:
         options = _heuristic_classify(classification_content, contexts)
         if options:
             reasoning = ""
-        elif not settings.anthropic_api_key:
-            reasoning = "Keyword match (set ANTHROPIC_API_KEY for smarter suggestions)."
-        elif model_not_found:
+        elif not settings.gemini_api_key:
+            reasoning = "Keyword match (set GEMINI_API_KEY for smarter suggestions)."
+        elif gemini_failure and "no longer available" in gemini_failure.lower():
             reasoning = (
-                f"Model {settings.anthropic_model!r} was not found for your API key. "
-                "Check ANTHROPIC_MODEL in backend/.env and restart."
+                f"Model {settings.gemini_model!r} is retired for your API key. "
+                "Set GEMINI_MODEL=gemini-3.5-flash in backend/.env and restart."
             )
         else:
             reasoning = "AI suggestion failed; using keyword match."
