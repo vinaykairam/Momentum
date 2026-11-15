@@ -1,7 +1,8 @@
-"""Math Me Genius: a stream that teaches math one lesson at a time.
+"""Genius Lab: a stream that teaches math and physics one lesson at a time.
 
-Lessons follow a fixed roadmap. Each lesson is an Item in the "Math Me Genius"
-stream, written by Gemini when it is reached. Completing a lesson queues the next.
+Each subject follows a fixed roadmap. Lessons alternate between subjects: finish a
+math lesson and the next one is physics, and vice versa. Each lesson is an Item in
+the "Genius Lab" stream, written by Gemini when it is reached.
 """
 
 from __future__ import annotations
@@ -21,10 +22,11 @@ from app.services.item_queue import next_queue_position
 
 logger = logging.getLogger(__name__)
 
-STREAM_NAME = "Math Me Genius"
-STREAM_DESCRIPTION = "Math from the very basics to genius level, one lesson at a time"
+STREAM_NAME = "Genius Lab"
+LEGACY_STREAM_NAMES = ("Math Me Genius",)
+STREAM_DESCRIPTION = "Math and physics from the very basics to genius level, alternating one lesson at a time"
 
-ROADMAP: list[str] = [
+MATH_ROADMAP: list[str] = [
     # Foundations
     "Counting and place value",
     "Addition and subtraction",
@@ -102,18 +104,96 @@ ROADMAP: list[str] = [
     "Abstract algebra: groups",
 ]
 
-_TITLE_RE = re.compile(r"^Lesson (\d+):")
+PHYSICS_ROADMAP: list[str] = [
+    # Foundations and motion
+    "What physics is: measurement, units and the scientific method",
+    "Scientific notation and orders of magnitude",
+    "Motion: distance, displacement and speed",
+    "Velocity and acceleration",
+    "Free fall and gravity",
+    "Vectors: adding forces and velocities",
+    "Projectile motion",
+    # Forces
+    "Newton's first law: inertia",
+    "Newton's second law: F = ma",
+    "Newton's third law: action and reaction",
+    "Friction",
+    "Circular motion",
+    "Universal gravitation and orbits",
+    # Energy and momentum
+    "Work and energy",
+    "Kinetic and potential energy",
+    "Conservation of energy",
+    "Power",
+    "Momentum and collisions",
+    "Torque and levers",
+    "Simple machines",
+    # Matter, heat and waves
+    "Pressure and fluids",
+    "Buoyancy",
+    "Temperature and heat",
+    "The laws of thermodynamics",
+    "Entropy",
+    "Oscillations and simple harmonic motion",
+    "Waves",
+    "Sound",
+    "Light and reflection",
+    "Refraction and lenses",
+    # Electricity and magnetism
+    "Electric charge and Coulomb's law",
+    "Electric fields",
+    "Voltage, current and resistance",
+    "Electric circuits",
+    "Magnetism",
+    "Electromagnetic induction",
+    "Maxwell's equations and electromagnetic waves",
+    # Modern physics
+    "Special relativity: time dilation and length contraction",
+    "Mass-energy equivalence: E = mc^2",
+    "Inside the atom",
+    "Photons and the photoelectric effect",
+    "Wave-particle duality",
+    "The uncertainty principle",
+    "Nuclear physics and radioactivity",
+    "General relativity: gravity as curved spacetime",
+    "Particle physics and the Standard Model",
+    "Cosmology: the Big Bang and the expanding universe",
+]
+
+SUBJECTS: dict[str, list[str]] = {"Math": MATH_ROADMAP, "Physics": PHYSICS_ROADMAP}
+_OTHER = {"Math": "Physics", "Physics": "Math"}
+
+_STORY_EXAMPLES = {
+    "Math": "Napier and logarithms, Pythagoras, Fibonacci, Pascal and Fermat on probability, "
+    "Newton and Leibniz on calculus",
+    "Physics": "Galileo and falling bodies, Newton and gravity, Faraday and induction, "
+    "Einstein and relativity, Marie Curie and radioactivity",
+}
+
+# Titles look like "Math 4: Division and remainders". Old "Lesson N:" titles are math.
+_TITLE_RE = re.compile(r"^(Lesson|Math|Physics) (\d+):")
+_FALLBACK_PREFIX = "Today's topic:"
 _lock = threading.Lock()
 
 
-def _lesson_number(title: str) -> int | None:
+def _parse_title(title: str) -> tuple[str, int] | None:
     match = _TITLE_RE.match(title)
-    return int(match.group(1)) if match else None
+    if not match:
+        return None
+    subject = "Math" if match.group(1) == "Lesson" else match.group(1)
+    return subject, int(match.group(2))
 
 
 def get_or_create_stream(db: Session) -> Stream:
-    stream = db.query(Stream).filter(Stream.name == STREAM_NAME, Stream.parent_id.is_(None)).first()
+    top_level = db.query(Stream).filter(Stream.parent_id.is_(None))
+    stream = top_level.filter(Stream.name == STREAM_NAME).first()
     if stream:
+        return stream
+    stream = top_level.filter(Stream.name.in_(LEGACY_STREAM_NAMES)).first()
+    if stream:
+        stream.name = STREAM_NAME
+        stream.description = STREAM_DESCRIPTION
+        db.flush()
         return stream
     stream = Stream(
         name=STREAM_NAME,
@@ -127,20 +207,35 @@ def get_or_create_stream(db: Session) -> Stream:
     return stream
 
 
-def _generate_lesson_text(number: int, topic: str) -> str | None:
+def _generate_lesson_text(subject: str, number: int, math_done: int) -> str | None:
     if not settings.gemini_api_key:
         return None
 
-    previous = ROADMAP[max(0, number - 4) : number - 1]
+    roadmap = SUBJECTS[subject]
+    topic = roadmap[number - 1]
+    previous = roadmap[max(0, number - 4) : number - 1]
+    if subject == "Math":
+        course = "basic arithmetic to advanced mathematics"
+        math_note = ""
+    else:
+        course = "everyday intuition to modern physics"
+        known = MATH_ROADMAP[:math_done]
+        math_note = (
+            "The learner is studying math alongside this course and has so far covered: "
+            + (", ".join(known) if known else "nothing yet")
+            + ". Only use math they have covered; if the topic needs more, explain it in "
+            "words and intuition, or introduce the bit of math needed very gently.\n"
+        )
+
     prompt = (
-        f"Write lesson {number} of {len(ROADMAP)} in a course that takes an adult learner from "
-        f"basic arithmetic to advanced mathematics. Today's topic: {topic}.\n"
-        + (f"Recent lessons covered: {', '.join(previous)}.\n" if previous else "")
+        f"Write {subject} lesson {number} of {len(roadmap)} in a course that takes an adult learner "
+        f"from {course}. Today's topic: {topic}.\n"
+        + (f"Recent {subject.lower()} lessons covered: {', '.join(previous)}.\n" if previous else "")
+        + math_note
         + "\nStructure the lesson with these sections, in plain text (no markdown symbols like # or *), "
         "each starting with its name in capitals on its own line:\n"
         "THE STORY - include this section ONLY if the topic has a well-documented history involving "
-        "real, named people or specific historical events (for example Napier and logarithms, "
-        "Pythagoras, Fibonacci, Pascal and Fermat on probability, Newton and Leibniz on calculus). "
+        f"real, named people or specific historical events (for example {_STORY_EXAMPLES[subject]}). "
         "If it does, tell it in an engaging way: who, when and where, the real problem they were "
         "stuck on, why the old way was painful, and how this idea changed things. Every person, "
         "date and event must be historically factual. Never invent or imagine characters, names, "
@@ -150,7 +245,7 @@ def _generate_lesson_text(number: int, topic: str) -> str | None:
         "the story, if there is one), building on earlier lessons.\n"
         "WORKED EXAMPLE - one example solved step by step.\n"
         "REAL WORLD - 2 or 3 concrete, practical situations where this is actually used "
-        "(money, cooking, building, games, science, tech, sports and so on), with numbers.\n"
+        "(money, cooking, building, games, sports, cars, phones, space and so on), with numbers.\n"
         "PRACTICE - exactly 2 practice questions, at least one set in a real-world scenario.\n"
         "ANSWERS - the answers to the 2 practice questions with a one-line explanation each.\n"
         "\nKeep it focused: around 500 to 700 words with a story, or 300 to 450 without one."
@@ -172,16 +267,25 @@ def _generate_lesson_text(number: int, topic: str) -> str | None:
         text = "".join(part.get("text", "") for part in parts).strip()
         return text or None
     except (httpx.HTTPError, ValueError, KeyError, IndexError) as exc:
-        logger.warning("Math Me Genius lesson generation failed: %s", exc)
+        logger.warning("Genius Lab lesson generation failed: %s", exc)
         return None
 
 
 def _fallback_text(topic: str) -> str:
     return (
-        f"Today's topic: {topic}.\n\n"
+        f"{_FALLBACK_PREFIX} {topic}.\n\n"
         "This lesson could not be written automatically (set GEMINI_API_KEY in backend/.env). "
         "Study this topic from any source, then mark it done to unlock the next one."
     )
+
+
+def _next_subject(lessons: list[tuple[Item, str, int]], last_numbers: dict[str, int]) -> str | None:
+    """Alternate subjects after each lesson; fall back to whichever subject still has topics."""
+    latest = max(lessons, key=lambda row: row[0].id)[1] if lessons else "Physics"
+    for subject in (_OTHER[latest], latest):
+        if last_numbers[subject] < len(SUBJECTS[subject]):
+            return subject
+    return None
 
 
 def queue_next_lesson() -> None:
@@ -191,32 +295,37 @@ def queue_next_lesson() -> None:
         try:
             stream = get_or_create_stream(db)
             items = db.query(Item).filter(Item.stream_id == stream.id).all()
-            pending = [i for i in items if i.status in (ItemStatus.next, ItemStatus.active, ItemStatus.backlog)]
+            lessons = [(item, *parsed) for item in items if (parsed := _parse_title(item.title))]
+            last_numbers = {subject: 0 for subject in SUBJECTS}
+            for _, subject, number in lessons:
+                last_numbers[subject] = max(last_numbers[subject], number)
+            math_done = sum(
+                1 for item, subject, _ in lessons if subject == "Math" and item.status == ItemStatus.completed
+            )
+
+            pending = [row for row in lessons if row[0].status in (ItemStatus.next, ItemStatus.active, ItemStatus.backlog)]
             if pending:
                 # A lesson queued before GEMINI_API_KEY was set gets written properly now.
-                for item in pending:
-                    number = _lesson_number(item.title)
-                    if number and 1 <= number <= len(ROADMAP) and (item.description or "").startswith(
-                        "Today's topic:"
-                    ):
-                        text = _generate_lesson_text(number, ROADMAP[number - 1])
+                for item, subject, number in pending:
+                    if number <= len(SUBJECTS[subject]) and (item.description or "").startswith(_FALLBACK_PREFIX):
+                        text = _generate_lesson_text(subject, number, math_done)
                         if text:
                             item.description = text
                 db.commit()
                 return
 
-            numbers = [n for n in (_lesson_number(item.title) for item in items) if n is not None]
-            number = max(numbers, default=0) + 1
-            if number > len(ROADMAP):
+            subject = _next_subject(lessons, last_numbers)
+            if subject is None:
                 db.commit()
                 return
 
-            topic = ROADMAP[number - 1]
-            text = _generate_lesson_text(number, topic) or _fallback_text(topic)
+            number = last_numbers[subject] + 1
+            topic = SUBJECTS[subject][number - 1]
+            text = _generate_lesson_text(subject, number, math_done) or _fallback_text(topic)
             db.add(
                 Item(
                     stream_id=stream.id,
-                    title=f"Lesson {number}: {topic}",
+                    title=f"{subject} {number}: {topic}",
                     description=text,
                     item_type=ItemType.course,
                     status=ItemStatus.next,
@@ -231,6 +340,6 @@ def queue_next_lesson() -> None:
             db.close()
 
 
-def is_math_stream(db: Session, stream_id: int) -> bool:
+def is_genius_lab_stream(db: Session, stream_id: int) -> bool:
     stream = db.get(Stream, stream_id)
     return bool(stream and stream.name == STREAM_NAME and stream.parent_id is None)
