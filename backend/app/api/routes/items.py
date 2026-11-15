@@ -123,6 +123,14 @@ def get_item(item_id: int, db: Session = Depends(get_db)) -> Item:
     return item
 
 
+@router.get("/{item_id}/lab-neighbors")
+def get_lab_neighbors(item_id: int, db: Session = Depends(get_db)) -> dict:
+    item = db.get(Item, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return genius_lab.lesson_neighbors(db, item)
+
+
 @router.patch("/{item_id}", response_model=ItemResponse)
 def update_item(
     item_id: int,

@@ -343,3 +343,22 @@ def queue_next_lesson() -> None:
 def is_genius_lab_stream(db: Session, stream_id: int) -> bool:
     stream = db.get(Stream, stream_id)
     return bool(stream and stream.name == STREAM_NAME and stream.parent_id is None)
+
+
+def lesson_neighbors(db: Session, item: Item) -> dict[str, dict | None]:
+    """Previous and next lesson in the same subject as `item`, for browsing back through a subject."""
+    parsed = _parse_title(item.title)
+    if not parsed or not is_genius_lab_stream(db, item.stream_id):
+        return {"previous": None, "next": None}
+    subject, number = parsed
+    by_number: dict[int, Item] = {}
+    for other in db.query(Item).filter(Item.stream_id == item.stream_id).all():
+        other_parsed = _parse_title(other.title)
+        if other_parsed and other_parsed[0] == subject:
+            by_number[other_parsed[1]] = other
+
+    def ref(n: int) -> dict | None:
+        found = by_number.get(n)
+        return {"id": found.id, "title": found.title} if found else None
+
+    return {"previous": ref(number - 1), "next": ref(number + 1)}

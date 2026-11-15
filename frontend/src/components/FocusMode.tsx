@@ -4,7 +4,7 @@ import { formatStreamLabel } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ExternalLink, Loader2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink, Loader2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface FocusModeProps {
@@ -21,20 +21,37 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
 
   const itemId = activeFocus?.item_id ?? null
   const [notes, setNotes] = useState('')
+  // Lab lessons: which lesson is on screen (browsing back through earlier lessons).
+  const [viewId, setViewId] = useState<number | null>(itemId)
+  useEffect(() => setViewId(itemId), [itemId])
+  const viewingCurrent = viewId === itemId
 
-  const { data: item, isLoading: itemLoading } = useQuery({
+  const { data: currentItem, isLoading: itemLoading } = useQuery({
     queryKey: ['item', itemId],
     queryFn: () => api.getItem(itemId!),
     enabled: focusMode && itemId !== null,
   })
+  const { data: viewedItem, isLoading: viewedLoading } = useQuery({
+    queryKey: ['item', viewId],
+    queryFn: () => api.getItem(viewId!),
+    enabled: focusMode && viewId !== null && !viewingCurrent,
+  })
+  const item = viewingCurrent ? currentItem : viewedItem
+  const isLabLesson = /^(Lesson|Math|Physics) \d+:/.test(item?.title ?? '')
+  const { data: neighbors } = useQuery({
+    queryKey: ['lab-neighbors', viewId],
+    queryFn: () => api.getLabNeighbors(viewId!),
+    enabled: focusMode && viewId !== null && isLabLesson,
+  })
 
   useEffect(() => {
+    const item = currentItem
     if (item) {
       setNotes(item.notes ?? '')
     } else {
       setNotes('')
     }
-  }, [item?.id, item?.notes])
+  }, [currentItem?.id, currentItem?.notes])
 
   const completeMutation = useMutation({
     mutationFn: () =>
@@ -63,7 +80,7 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
 
   const streamLabel = formatStreamLabel(activeFocus.stream_name, activeFocus.parent_stream_name)
   const displayTitle = item?.title ?? activeFocus.action
-  const canLogDone = itemId !== null && item && item.status !== 'completed'
+  const canLogDone = viewingCurrent && itemId !== null && item && item.status !== 'completed'
 
   return (
     <AnimatePresence>
@@ -101,7 +118,41 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
               {displayTitle}
             </motion.h1>
 
-            {itemId && itemLoading ? (
+            {isLabLesson && (neighbors?.previous || neighbors?.next || !viewingCurrent) && (
+              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+                {neighbors?.previous && (
+                  <button
+                    type="button"
+                    onClick={() => setViewId(neighbors.previous!.id)}
+                    className="page-meta inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous: {neighbors.previous.title}
+                  </button>
+                )}
+                {!viewingCurrent && neighbors?.next && (
+                  <button
+                    type="button"
+                    onClick={() => setViewId(neighbors.next!.id)}
+                    className="page-meta inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Next: {neighbors.next.title}
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+                {!viewingCurrent && (
+                  <button
+                    type="button"
+                    onClick={() => setViewId(itemId)}
+                    className="page-meta font-medium text-foreground underline underline-offset-4"
+                  >
+                    Back to current lesson
+                  </button>
+                )}
+              </div>
+            )}
+
+            {itemId && (itemLoading || (!viewingCurrent && viewedLoading)) ? (
               <div className="mt-10 flex justify-center">
                 <Loader2 className="h-5 w-5 animate-spin text-muted" />
               </div>
@@ -132,7 +183,7 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
                   </motion.a>
                 )}
 
-                {itemId && item && (
+                {viewingCurrent && itemId && item && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}

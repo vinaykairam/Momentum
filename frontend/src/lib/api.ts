@@ -97,6 +97,16 @@ export interface UpdateItemPayload {
   estimated_duration?: number | null
 }
 
+export interface LessonRef {
+  id: number
+  title: string
+}
+
+export interface LabNeighbors {
+  previous: LessonRef | null
+  next: LessonRef | null
+}
+
 const API_BASE = '/api'
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -136,6 +146,7 @@ export const api = {
   deleteStream: (id: number) => fetchJson<void>(`/streams/${id}`, { method: 'DELETE' }),
   deleteItem: (id: number) => fetchJson<void>(`/items/${id}`, { method: 'DELETE' }),
   getItem: (id: number) => fetchJson<Item>(`/items/${id}`),
+  getLabNeighbors: (id: number) => fetchJson<LabNeighbors>(`/items/${id}/lab-neighbors`),
   updateItem: (id: number, payload: UpdateItemPayload) =>
     fetchJson<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   reorderItem: (id: number, direction: 'up' | 'down') =>
