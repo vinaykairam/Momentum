@@ -1,8 +1,8 @@
-"""Genius Lab: a stream that teaches math and physics one lesson at a time.
+"""Lab: a stream that teaches math and physics one lesson at a time.
 
 Each subject follows a fixed roadmap. Lessons alternate between subjects: finish a
 math lesson and the next one is physics, and vice versa. Each lesson is an Item in
-the "Genius Lab" stream, written by Gemini when it is reached.
+the "Lab" stream, written by Gemini when it is reached.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from app.services.item_queue import next_queue_position
 
 logger = logging.getLogger(__name__)
 
-STREAM_NAME = "Genius Lab"
-LEGACY_STREAM_NAMES = ("Math Me Genius",)
+STREAM_NAME = "Lab"
+LEGACY_STREAM_NAMES = ("Genius Lab", "Math Me Genius")
 STREAM_DESCRIPTION = "Math and physics from the very basics to genius level, alternating one lesson at a time"
 
 MATH_ROADMAP: list[str] = [
