@@ -112,7 +112,7 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.15, duration: 0.4, ease }}
-                    className="page-meta mt-6 leading-relaxed"
+                    className="page-meta mt-6 leading-relaxed whitespace-pre-line text-left"
                   >
                     {item.description}
                   </motion.p>

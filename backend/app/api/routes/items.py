@@ -4,7 +4,7 @@ import csv
 import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -12,6 +12,7 @@ from app.models.item import Item, ItemStatus
 from app.models.stream import Stream
 from app.schemas.item import ItemCreate, ItemResponse, ItemUpdate
 from app.schemas.item_reorder import ItemReorderRequest
+from app.services import math_genius
 from app.services.item_queue import item_queue_order, next_queue_position, reorder_item
 from app.services.momentum_engine import refresh_all_stream_momentum
 
@@ -123,7 +124,12 @@ def get_item(item_id: int, db: Session = Depends(get_db)) -> Item:
 
 
 @router.patch("/{item_id}", response_model=ItemResponse)
-def update_item(item_id: int, payload: ItemUpdate, db: Session = Depends(get_db)) -> Item:
+def update_item(
+    item_id: int,
+    payload: ItemUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> Item:
     item = db.get(Item, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -150,6 +156,10 @@ def update_item(item_id: int, payload: ItemUpdate, db: Session = Depends(get_db)
 
     db.commit()
     db.refresh(item)
+
+    if item.status == ItemStatus.completed and previous_status != ItemStatus.completed:
+        if math_genius.is_math_stream(db, item.stream_id):
+            background_tasks.add_task(math_genius.queue_next_lesson)
     return item
 
 
