@@ -149,6 +149,9 @@ def _call_gemini(content: str, contexts: list[_StreamContext]) -> list[StreamSug
                 "generationConfig": {
                     "temperature": 0.2,
                     "responseMimeType": "application/json",
+                    # Flash models think by default (thousands of tokens, 10s+ per call).
+                    # Picking a stream doesn't need it.
+                    "thinkingConfig": {"thinkingBudget": 0},
                 },
             },
         )
