@@ -78,11 +78,6 @@ export function OneThing({ focus }: OneThingProps) {
         <Play className="h-4 w-4" />
         Start 10 minutes
       </Button>
-      {focus.skip_count > 0 && (
-        <p className="page-meta mt-3 text-center">
-          Put off {focus.skip_count} {focus.skip_count === 1 ? 'time' : 'times'}
-        </p>
-      )}
     </motion.section>
   )
 }

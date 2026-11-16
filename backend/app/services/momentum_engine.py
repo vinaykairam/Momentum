@@ -49,9 +49,22 @@ def has_children(stream_id: int, streams: list[Stream]) -> bool:
     return any(stream.parent_id == stream_id for stream in streams)
 
 
-def focusable_streams(streams: list[Stream]) -> list[Stream]:
-    """Leaf streams only — parent containers are excluded from focus."""
-    return [stream for stream in streams if not has_children(stream.id, streams)]
+def _has_own_queued_items(stream: Stream, db: Session) -> bool:
+    return (
+        db.query(Item.id)
+        .filter(Item.stream_id == stream.id, Item.status.in_(QUEUED_STATUSES))
+        .first()
+        is not None
+    )
+
+
+def focusable_streams(streams: list[Stream], db: Session) -> list[Stream]:
+    """Leaf streams, plus parents that hold queued items of their own (e.g. Learn, which also contains Lab)."""
+    return [
+        stream
+        for stream in streams
+        if not has_children(stream.id, streams) or _has_own_queued_items(stream, db)
+    ]
 
 
 def stream_display_name(stream: Stream, streams_by_id: dict[int, Stream]) -> tuple[str, str | None]:
@@ -115,11 +128,18 @@ def refresh_all_stream_momentum(db: Session) -> None:
         if children:
             for child in children:
                 update_node(child)
-            stream.momentum_score = round(sum(child.momentum_score for child in children) / len(children), 1)
+            scores = [child.momentum_score for child in children]
+            # A parent can hold items of its own alongside sub-streams; count it like one more child.
+            own_items = db.query(Item.id).filter(Item.stream_id == stream.id).first() is not None
+            if own_items:
+                scores.append(compute_momentum_score(stream, db))
+            stream.momentum_score = round(sum(scores) / len(scores), 1)
             stream.momentum_state = score_to_state(stream.momentum_score)
-            child_dates = [child.last_activity_date for child in children if child.last_activity_date]
-            if child_dates:
-                stream.last_activity_date = max(child_dates)
+            dates = [child.last_activity_date for child in children if child.last_activity_date]
+            if own_items and stream.last_activity_date:
+                dates.append(stream.last_activity_date)
+            if dates:
+                stream.last_activity_date = max(dates)
         else:
             _update_leaf_momentum(stream, db)
 
@@ -172,7 +192,7 @@ def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommend
     db.commit()
 
     streams_by_id = _stream_map(streams)
-    today_streams = focusable_streams(streams_relevant_today(streams))
+    today_streams = focusable_streams(streams_relevant_today(streams), db)
     sorted_streams = sorted(today_streams, key=lambda stream: (stream.momentum_score, -stream.priority_weight))
 
     recommendations: list[FocusRecommendation] = []

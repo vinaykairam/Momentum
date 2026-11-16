@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 STREAM_NAME = "Lab"
 LEGACY_STREAM_NAMES = ("Genius Lab", "Math Me Genius")
+# Lab lives inside Learn when that stream exists.
+PARENT_STREAM_NAME = "Learn"
 STREAM_DESCRIPTION = "Math and physics from the very basics to genius level, alternating one lesson at a time"
 
 MATH_ROADMAP: list[str] = [
@@ -185,18 +187,21 @@ def _parse_title(title: str) -> tuple[str, int] | None:
 
 
 def get_or_create_stream(db: Session) -> Stream:
-    top_level = db.query(Stream).filter(Stream.parent_id.is_(None))
-    stream = top_level.filter(Stream.name == STREAM_NAME).first()
+    stream = db.query(Stream).filter(Stream.name == STREAM_NAME).order_by(Stream.id).first()
     if stream:
         return stream
-    stream = top_level.filter(Stream.name.in_(LEGACY_STREAM_NAMES)).first()
+    stream = db.query(Stream).filter(Stream.name.in_(LEGACY_STREAM_NAMES)).order_by(Stream.id).first()
     if stream:
         stream.name = STREAM_NAME
         stream.description = STREAM_DESCRIPTION
         db.flush()
         return stream
+    parent = (
+        db.query(Stream).filter(Stream.name == PARENT_STREAM_NAME, Stream.parent_id.is_(None)).first()
+    )
     stream = Stream(
         name=STREAM_NAME,
+        parent_id=parent.id if parent else None,
         description=STREAM_DESCRIPTION,
         category=StreamCategory.everyday,
         type=StreamType.long_term,
@@ -342,7 +347,7 @@ def queue_next_lesson() -> None:
 
 def is_genius_lab_stream(db: Session, stream_id: int) -> bool:
     stream = db.get(Stream, stream_id)
-    return bool(stream and stream.name == STREAM_NAME and stream.parent_id is None)
+    return bool(stream and stream.name == STREAM_NAME)
 
 
 def lesson_neighbors(db: Session, item: Item) -> dict[str, dict | None]:
