@@ -11,6 +11,8 @@ interface PageShellProps {
   onBack?: () => void
   backLabel?: string
   actions?: ReactNode
+  /** Use the full page width (e.g. side-by-side columns). */
+  wide?: boolean
   children: ReactNode
 }
 
@@ -26,9 +28,9 @@ export function PageLoading() {
   )
 }
 
-export function PageShell({ title, subtitle, onBack, backLabel = 'Today', actions, children }: PageShellProps) {
+export function PageShell({ title, subtitle, onBack, backLabel = 'Today', actions, wide, children }: PageShellProps) {
   return (
-    <div className="mx-auto max-w-2xl px-6 py-12 md:py-16">
+    <div className={`mx-auto ${wide ? 'max-w-7xl' : 'max-w-2xl'} px-6 py-12 md:py-16`}>
       <motion.header
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

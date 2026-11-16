@@ -256,6 +256,7 @@ export function ItemsPage({ onBack }: ItemsPageProps) {
   return (
     <PageShell
       title="All Items"
+      wide
       subtitle={`${activeItems.length} queued`}
       onBack={onBack}
       actions={
@@ -277,14 +278,14 @@ export function ItemsPage({ onBack }: ItemsPageProps) {
       {groupedItems.length === 0 ? (
         <p className="page-body py-16 text-center text-muted">No items yet. Use Capture to add something.</p>
       ) : (
-        <div className="space-y-4">
+        <div className="-mx-6 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-6 pb-4 md:snap-none">
           {groupedItems.map((group, groupIndex) => (
             <motion.section
               key={group.stream.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: groupIndex * 0.04, duration: 0.5, ease }}
-              className="stream-group !py-0"
+              className="stream-group !py-0 w-[85vw] max-w-md shrink-0 snap-start md:w-auto md:min-w-[22rem] md:max-w-none md:flex-1"
             >
               <StreamQueue group={group} {...rowHandlers} />
             </motion.section>
