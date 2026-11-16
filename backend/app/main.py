@@ -130,10 +130,13 @@ def ensure_item_queue_position_column() -> None:
         return
     with engine.connect() as conn:
         columns = conn.execute(text("PRAGMA table_info(items)")).fetchall()
-        if not any(column[1] == "queue_position" for column in columns):
-            conn.execute(text("ALTER TABLE items ADD COLUMN queue_position INTEGER NOT NULL DEFAULT 0"))
-            conn.commit()
+        if any(column[1] == "queue_position" for column in columns):
+            # Already set up: leave the queue order alone (it holds manual reordering).
+            return
+        conn.execute(text("ALTER TABLE items ADD COLUMN queue_position INTEGER NOT NULL DEFAULT 0"))
+        conn.commit()
 
+    # New column: number each queue by creation date once.
     db = SessionLocal()
     try:
         rows = (
