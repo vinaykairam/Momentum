@@ -13,6 +13,8 @@ class FocusRecommendation(BaseModel):
     momentum_score: float
     momentum_state: str
     recovery_mode: bool = False
+    first_step: str | None = None
+    skip_count: int = 0
 
 
 class DailyFocusResponse(BaseModel):

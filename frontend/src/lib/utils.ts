@@ -63,3 +63,8 @@ export function momentumBarColor(state: string): string {
       return 'bg-muted'
   }
 }
+
+/** Lab lessons are written by the app; they skip first steps, splitting and dropping. */
+export function isLabLessonTitle(title: string | null | undefined): boolean {
+  return /^(Lesson|Math|Physics) \d+:/.test(title ?? '')
+}

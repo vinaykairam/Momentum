@@ -1,7 +1,10 @@
 import { FocusCard } from '@/components/FocusCard'
+import { OneThing } from '@/components/OneThing'
 import type { FocusRecommendation } from '@/lib/api'
 import { groupFocusRecommendations } from '@/lib/focus-groups'
 import { motion } from 'framer-motion'
+import { ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 
 interface TodaysFocusProps {
   focus: FocusRecommendation[]
@@ -14,6 +17,8 @@ function StreamDivider() {
 }
 
 export function TodaysFocus({ focus }: TodaysFocusProps) {
+  const [showRest, setShowRest] = useState(false)
+
   if (focus.length === 0) {
     return (
       <motion.p
@@ -27,10 +32,27 @@ export function TodaysFocus({ focus }: TodaysFocusProps) {
     )
   }
 
-  const groups = groupFocusRecommendations(focus)
+  const [oneThing, ...rest] = focus
+  const groups = groupFocusRecommendations(rest)
 
   return (
     <div>
+      <OneThing key={`${oneThing.stream_id}-${oneThing.item_id}`} focus={oneThing} />
+
+      {rest.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowRest((open) => !open)}
+          className="page-meta mx-auto mt-10 mb-6 flex items-center gap-1.5 hover:text-foreground"
+          aria-expanded={showRest}
+        >
+          {showRest ? 'Hide' : 'Also today'} · {rest.length} more
+          <ChevronDown className={`h-4 w-4 transition-transform ${showRest ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+
+      {showRest && (
+        <div>
       {groups.map((group, groupIndex) => (
         <div key={group.key}>
           {groupIndex > 0 && <StreamDivider />}
@@ -54,6 +76,8 @@ export function TodaysFocus({ focus }: TodaysFocusProps) {
           </motion.section>
         </div>
       ))}
+        </div>
+      )}
     </div>
   )
 }

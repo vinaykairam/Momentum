@@ -38,6 +38,8 @@ export interface FocusRecommendation {
   momentum_score: number
   momentum_state: string
   recovery_mode: boolean
+  first_step: string | null
+  skip_count: number
 }
 
 export interface Dashboard {
@@ -82,6 +84,9 @@ export interface Item {
   created_at: string
   updated_at: string
   last_accessed: string | null
+  first_step: string | null
+  skip_count: number
+  snoozed_until: string | null
 }
 
 export interface UpdateItemPayload {
@@ -154,6 +159,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ direction }),
     }),
+  ensureFirstStep: (id: number) => fetchJson<Item>(`/items/${id}/first-step`, { method: 'POST' }),
+  logProgress: (id: number, notes: string | null) =>
+    fetchJson<Item>(`/items/${id}/progress`, { method: 'POST', body: JSON.stringify({ notes }) }),
+  snoozeItem: (id: number, days: number, notes: string | null) =>
+    fetchJson<Item>(`/items/${id}/snooze`, { method: 'POST', body: JSON.stringify({ days, notes }) }),
+  splitItem: (id: number) => fetchJson<Item[]>(`/items/${id}/split`, { method: 'POST' }),
   suggestStream: (content: string) =>
     fetchJson<StreamSuggestion>('/capture/suggest-stream', {
       method: 'POST',

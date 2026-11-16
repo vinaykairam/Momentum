@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.item import Item, ItemEffort, ItemStatus
@@ -135,7 +136,11 @@ def _pick_action_item(stream: Stream, db: Session) -> Item | None:
     """Top queued item for this stream, matching the Items page order."""
     return (
         db.query(Item)
-        .filter(Item.stream_id == stream.id, Item.status.in_(QUEUED_STATUSES))
+        .filter(
+            Item.stream_id == stream.id,
+            Item.status.in_(QUEUED_STATUSES),
+            or_(Item.snoozed_until.is_(None), Item.snoozed_until <= date.today()),
+        )
         .order_by(*item_queue_order())
         .first()
     )
@@ -145,10 +150,10 @@ def _recovery_action(stream: Stream, item: Item | None) -> tuple[str, int]:
     if item and item.effort_estimate == ItemEffort.tiny:
         return item.title, item.estimated_duration or 15
 
-    name = stream.name
+    # The item's 10-minute first step is the low-pressure way in, so keep the plain title.
     if item:
-        return f"Spend 15 minutes on {item.title}", 15
-    return f"Spend 15 minutes on {name}", 15
+        return item.title, 15
+    return f"Spend 15 minutes on {stream.name}", 15
 
 
 def _normal_action(item: Item | None, stream: Stream) -> tuple[str, int]:
@@ -198,6 +203,8 @@ def generate_daily_focus(db: Session, max_items: int = 5) -> list[FocusRecommend
                 momentum_score=stream.momentum_score,
                 momentum_state=stream.momentum_state.value,
                 recovery_mode=recovery,
+                first_step=item.first_step,
+                skip_count=item.skip_count or 0,
             )
         )
 

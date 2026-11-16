@@ -1,10 +1,11 @@
+import { FocusTimer } from '@/components/FocusTimer'
 import { Button } from '@/components/ui/button'
-import { api } from '@/lib/api'
-import { formatStreamLabel } from '@/lib/utils'
+import { api, type Item } from '@/lib/api'
+import { formatStreamLabel, isLabLessonTitle } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, ExternalLink, Loader2, X } from 'lucide-react'
+import { Archive, ChevronLeft, ChevronRight, ExternalLink, Loader2, Moon, Scissors, TrendingUp, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface FocusModeProps {
@@ -18,9 +19,16 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
   const focusMode = useAppStore((s) => s.focusMode)
   const activeFocus = useAppStore((s) => s.activeFocus)
   const exitFocus = useAppStore((s) => s.exitFocus)
+  const autoStartTimer = useAppStore((s) => s.autoStartTimer)
 
   const itemId = activeFocus?.item_id ?? null
   const [notes, setNotes] = useState('')
+  const [confirmDrop, setConfirmDrop] = useState(false)
+  const [splitSteps, setSplitSteps] = useState<Item[] | null>(null)
+  useEffect(() => {
+    setConfirmDrop(false)
+    setSplitSteps(null)
+  }, [itemId])
   // Lab lessons: which lesson is on screen (browsing back through earlier lessons).
   const [viewId, setViewId] = useState<number | null>(itemId)
   useEffect(() => setViewId(itemId), [itemId])
@@ -37,7 +45,7 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
     enabled: focusMode && viewId !== null && !viewingCurrent,
   })
   const item = viewingCurrent ? currentItem : viewedItem
-  const isLabLesson = /^(Lesson|Math|Physics) \d+:/.test(item?.title ?? '')
+  const isLabLesson = isLabLessonTitle(item?.title)
   const { data: neighbors } = useQuery({
     queryKey: ['lab-neighbors', viewId],
     queryFn: () => api.getLabNeighbors(viewId!),
@@ -52,6 +60,50 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
       setNotes('')
     }
   }, [currentItem?.id, currentItem?.notes])
+
+  const refreshQueues = () => {
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    queryClient.invalidateQueries({ queryKey: ['items'] })
+    queryClient.invalidateQueries({ queryKey: ['item', itemId] })
+  }
+  const trimmedNotes = () => notes.trim() || null
+
+  const progressMutation = useMutation({
+    mutationFn: () => api.logProgress(itemId!, trimmedNotes()),
+    onSuccess: () => {
+      refreshQueues()
+      exitFocus()
+    },
+  })
+  const snoozeMutation = useMutation({
+    mutationFn: (days: number) => api.snoozeItem(itemId!, days, trimmedNotes()),
+    onSuccess: () => {
+      refreshQueues()
+      exitFocus()
+    },
+  })
+  const dropMutation = useMutation({
+    mutationFn: () => api.updateItem(itemId!, { status: 'archived', notes: trimmedNotes() }),
+    onSuccess: () => {
+      refreshQueues()
+      exitFocus()
+    },
+  })
+  const splitMutation = useMutation({
+    mutationFn: async () => {
+      if (notes.trim() !== (currentItem?.notes ?? '').trim()) {
+        await api.updateItem(itemId!, { notes: trimmedNotes() })
+      }
+      return api.splitItem(itemId!)
+    },
+    onSuccess: (steps) => {
+      refreshQueues()
+      setSplitSteps(steps)
+    },
+  })
+  const busy =
+    progressMutation.isPending || snoozeMutation.isPending || dropMutation.isPending || splitMutation.isPending
+  const actionError = [progressMutation, snoozeMutation, dropMutation, splitMutation].find((m) => m.isError)?.error
 
   const completeMutation = useMutation({
     mutationFn: () =>
@@ -80,7 +132,12 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
 
   const streamLabel = formatStreamLabel(activeFocus.stream_name, activeFocus.parent_stream_name)
   const displayTitle = item?.title ?? activeFocus.action
-  const canLogDone = viewingCurrent && itemId !== null && item && item.status !== 'completed'
+  const canLogDone = Boolean(
+    viewingCurrent && itemId !== null && item && item.status !== 'completed' && item.status !== 'archived',
+  )
+  const currentIsLab = isLabLessonTitle(currentItem?.title ?? activeFocus.action)
+  const firstStep = currentItem?.first_step ?? activeFocus.first_step
+  const skipCount = currentItem?.skip_count ?? activeFocus.skip_count ?? 0
 
   return (
     <AnimatePresence>
@@ -152,7 +209,55 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
               </div>
             )}
 
-            {itemId && (itemLoading || (!viewingCurrent && viewedLoading)) ? (
+            {canLogDone && !splitSteps && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.12, duration: 0.4, ease }}
+                className="mt-8 rounded-2xl border border-border p-5"
+              >
+                {firstStep && !currentIsLab && (
+                  <>
+                    <p className="page-meta">First step</p>
+                    <p className="mt-1 mb-4 text-lg leading-relaxed">{firstStep}</p>
+                  </>
+                )}
+                <FocusTimer key={itemId} autoStart={autoStartTimer} />
+              </motion.div>
+            )}
+
+            {canLogDone && !splitSteps && !currentIsLab && skipCount >= 3 && (
+              <div className="mt-4 rounded-2xl bg-accent-soft p-5">
+                <p className="text-lg">You've put this off {skipCount} times.</p>
+                <p className="page-meta mt-1">
+                  That usually means it's too big or doesn't matter anymore. Shrink it or drop it?
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => splitMutation.mutate()} className="gap-1.5">
+                    <Scissors className="h-4 w-4" /> Break it down
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => dropMutation.mutate()} className="gap-1.5">
+                    <Archive className="h-4 w-4" /> Drop it
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {splitSteps && (
+              <div className="mt-8 rounded-2xl border border-border p-5">
+                <p className="page-meta">Broken into {splitSteps.length} steps, in your queue now:</p>
+                <ol className="mt-3 list-decimal space-y-2 pl-6 text-lg">
+                  {splitSteps.map((step) => (
+                    <li key={step.id}>{step.title}</li>
+                  ))}
+                </ol>
+                <Button variant="accent" size="lg" className="mt-6 w-full" onClick={exitFocus}>
+                  Back to Today
+                </Button>
+              </div>
+            )}
+
+            {splitSteps ? null : itemId && (itemLoading || (!viewingCurrent && viewedLoading)) ? (
               <div className="mt-10 flex justify-center">
                 <Loader2 className="h-5 w-5 animate-spin text-muted" />
               </div>
@@ -225,6 +330,90 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
                         'Log done'
                       )}
                     </Button>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <Button
+                        variant="outline"
+                        size="md"
+                        disabled={busy}
+                        onClick={() => progressMutation.mutate()}
+                        className="gap-1.5"
+                        title="Made progress but not finished. Back tomorrow."
+                      >
+                        {progressMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
+                        Worked on it
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="md"
+                        disabled={busy}
+                        onClick={() => snoozeMutation.mutate(1)}
+                        className="gap-1.5"
+                        title="Not today. Back tomorrow."
+                      >
+                        {snoozeMutation.isPending && snoozeMutation.variables === 1 ? <Loader2 className="h-4 w-4 animate-spin" /> : <Moon className="h-4 w-4" />}
+                        Tomorrow
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="md"
+                        disabled={busy}
+                        onClick={() => snoozeMutation.mutate(7)}
+                        className="gap-1.5"
+                        title="Not this week. Back in 7 days."
+                      >
+                        {snoozeMutation.isPending && snoozeMutation.variables === 7 ? <Loader2 className="h-4 w-4 animate-spin" /> : <Moon className="h-4 w-4" />}
+                        Next week
+                      </Button>
+                      {!currentIsLab && (
+                        <Button
+                          variant="outline"
+                          size="md"
+                          disabled={busy}
+                          onClick={() => splitMutation.mutate()}
+                          className="gap-1.5"
+                          title="Break it into smaller steps"
+                        >
+                          {splitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scissors className="h-4 w-4" />}
+                          Too big
+                        </Button>
+                      )}
+                    </div>
+
+                    {!currentIsLab && (
+                      <div className="mt-4 text-center">
+                        {confirmDrop ? (
+                          <span className="page-meta inline-flex flex-wrap items-center justify-center gap-3">
+                            Drop this for good? It moves to archived.
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => dropMutation.mutate()}
+                              className="font-medium text-critical underline underline-offset-4"
+                            >
+                              Drop it
+                            </button>
+                            <button type="button" onClick={() => setConfirmDrop(false)} className="underline underline-offset-4">
+                              Keep
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDrop(true)}
+                            className="page-meta inline-flex items-center gap-1.5 hover:text-foreground"
+                          >
+                            <Archive className="h-4 w-4" /> Don't want to do this anymore
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {actionError && (
+                      <p className="page-meta mt-3 text-center text-critical">
+                        {actionError instanceof Error ? actionError.message : 'Something went wrong'}
+                      </p>
+                    )}
                     {completeMutation.isError && (
                       <p className="page-meta mt-3 text-center text-critical">
                         {completeMutation.error instanceof Error

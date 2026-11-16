@@ -1,8 +1,8 @@
 import enum
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -71,5 +71,11 @@ class Item(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     last_accessed: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Smallest concrete action to get started (written by Gemini).
+    first_step: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Times this item was put off ("not today"); reset when you make progress.
+    skip_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Hidden from Today until this date.
+    snoozed_until: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     stream = relationship("Stream", back_populates="items")

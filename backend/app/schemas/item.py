@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,3 +45,15 @@ class ItemResponse(ItemBase):
     created_at: datetime
     updated_at: datetime
     last_accessed: datetime | None
+    first_step: str | None = None
+    skip_count: int = 0
+    snoozed_until: date | None = None
+
+
+class ItemProgressRequest(BaseModel):
+    notes: str | None = None
+
+
+class ItemSnoozeRequest(BaseModel):
+    days: int = Field(default=1, ge=1, le=60)
+    notes: str | None = None

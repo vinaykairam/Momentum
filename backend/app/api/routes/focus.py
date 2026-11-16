@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.focus import CaptureRequest, CaptureResponse, DailyFocusResponse, DashboardResponse
 from app.schemas.stream_suggestion import StreamSuggestionRequest, StreamSuggestionResponse
+from app.services import item_coach
 from app.services.capture import capture_item
 from app.services.stream_classifier import suggest_stream_for_capture
 from app.services.momentum_engine import (
@@ -38,8 +39,12 @@ def suggest_stream(payload: StreamSuggestionRequest, db: Session = Depends(get_d
 
 
 @router.post("/capture", response_model=CaptureResponse, status_code=201)
-def capture(payload: CaptureRequest, db: Session = Depends(get_db)) -> CaptureResponse:
+def capture(
+    payload: CaptureRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> CaptureResponse:
     try:
-        return capture_item(payload.content, db, stream_id=payload.stream_id)
+        result = capture_item(payload.content, db, stream_id=payload.stream_id)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    background_tasks.add_task(item_coach.fill_first_step, result.item_id)
+    return result

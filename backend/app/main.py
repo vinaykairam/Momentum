@@ -156,10 +156,29 @@ def ensure_item_queue_position_column() -> None:
         db.close()
 
 
+def ensure_item_coach_columns() -> None:
+    """Columns for first steps, skips and snoozes (SQLite has no migrations here)."""
+    if not settings.database_url.startswith("sqlite"):
+        return
+    wanted = {
+        "first_step": "TEXT",
+        "skip_count": "INTEGER NOT NULL DEFAULT 0",
+        "snoozed_until": "DATE",
+    }
+    with engine.connect() as conn:
+        existing = {column[1] for column in conn.execute(text("PRAGMA table_info(items)")).fetchall()}
+        for name, ddl in wanted.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE items ADD COLUMN {name} {ddl}"))
+        conn.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_item_notes_column()
+    # Before any ORM query on items: the model selects these columns.
+    ensure_item_coach_columns()
     ensure_item_queue_position_column()
     if settings.seed_demo_data:
         seed_demo_data()
