@@ -37,6 +37,7 @@ export function Dashboard({ onViewItems, onViewStreams }: DashboardProps) {
       <FocusMode nextFocus={nextFocus} />
       <PageShell
         title="Today"
+        wide
         actions={
           <>
             {onViewStreams && (

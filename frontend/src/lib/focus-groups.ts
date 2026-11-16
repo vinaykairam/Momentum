@@ -7,28 +7,25 @@ export interface FocusGroup {
   isGrouped: boolean
 }
 
+/** Groups recommendations by top-level stream, so e.g. "Learn" and "Learn > Lab" share one group. */
 export function groupFocusRecommendations(focus: FocusRecommendation[]): FocusGroup[] {
   const groups: FocusGroup[] = []
-  const parentIndex = new Map<string, number>()
+  const byName = new Map<string, FocusGroup>()
 
   for (const item of focus) {
-    if (item.parent_stream_name) {
-      const parent = item.parent_stream_name
-      let index = parentIndex.get(parent)
-      if (index === undefined) {
-        index = groups.length
-        parentIndex.set(parent, index)
-        groups.push({ key: parent, parentName: parent, items: [], isGrouped: true })
-      }
-      groups[index].items.push(item)
-    } else {
-      groups.push({
-        key: `${item.stream_id}-${item.item_id ?? 'focus'}`,
-        parentName: null,
-        items: [item],
-        isGrouped: false,
-      })
+    const topLevel = item.parent_stream_name ?? item.stream_name
+    let group = byName.get(topLevel)
+    if (!group) {
+      group = { key: topLevel, parentName: topLevel, items: [], isGrouped: false }
+      byName.set(topLevel, group)
+      groups.push(group)
     }
+    group.items.push(item)
+  }
+
+  for (const group of groups) {
+    group.isGrouped = group.items.length > 1 || group.items.some((item) => item.parent_stream_name)
+    if (!group.isGrouped) group.parentName = null
   }
 
   return groups

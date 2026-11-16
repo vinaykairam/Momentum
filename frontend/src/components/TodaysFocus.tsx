@@ -12,10 +12,6 @@ interface TodaysFocusProps {
 
 const ease = [0.25, 0.1, 0.25, 1] as const
 
-function StreamDivider() {
-  return <hr className="stream-divider" aria-hidden="true" />
-}
-
 export function TodaysFocus({ focus }: TodaysFocusProps) {
   const [showRest, setShowRest] = useState(false)
 
@@ -37,7 +33,9 @@ export function TodaysFocus({ focus }: TodaysFocusProps) {
 
   return (
     <div>
-      <OneThing key={`${oneThing.stream_id}-${oneThing.item_id}`} focus={oneThing} />
+      <div className="mx-auto max-w-2xl">
+        <OneThing key={`${oneThing.stream_id}-${oneThing.item_id}`} focus={oneThing} />
+      </div>
 
       {rest.length > 0 && (
         <button
@@ -52,30 +50,28 @@ export function TodaysFocus({ focus }: TodaysFocusProps) {
       )}
 
       {showRest && (
-        <div>
-      {groups.map((group, groupIndex) => (
-        <div key={group.key}>
-          {groupIndex > 0 && <StreamDivider />}
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: groupIndex * 0.06, duration: 0.5, ease }}
-            className="stream-group"
-          >
-            {group.isGrouped && <p className="stream-group-title">{group.parentName}</p>}
-            <div className={group.isGrouped ? 'stream-group-items' : undefined}>
-              {group.items.map((item, itemIndex) => (
-                <FocusCard
-                  key={`${item.stream_id}-${item.item_id}`}
-                  focus={item}
-                  index={groupIndex + itemIndex}
-                  nested={group.isGrouped}
-                />
-              ))}
-            </div>
-          </motion.section>
-        </div>
-      ))}
+        <div className="-mx-6 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-6 pb-4 md:snap-none">
+          {groups.map((group, groupIndex) => (
+            <motion.section
+              key={group.key}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: groupIndex * 0.06, duration: 0.5, ease }}
+              className="stream-group w-[85vw] max-w-md shrink-0 snap-start md:w-auto md:min-w-[18rem] md:max-w-none md:flex-1"
+            >
+              {group.isGrouped && <p className="stream-group-title">{group.parentName}</p>}
+              <div className={group.isGrouped ? 'stream-group-items' : undefined}>
+                {group.items.map((item, itemIndex) => (
+                  <FocusCard
+                    key={`${item.stream_id}-${item.item_id}`}
+                    focus={item}
+                    index={groupIndex + itemIndex}
+                    nested={group.isGrouped}
+                  />
+                ))}
+              </div>
+            </motion.section>
+          ))}
         </div>
       )}
     </div>
