@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.item import Item, ItemEffort, ItemStatus, ItemType
-from app.services import genius_lab
+from app.services import courses
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ def generate_split(item: Item) -> list[str]:
 def wants_first_step(db: Session, item: Item) -> bool:
     return (
         item.status in (ItemStatus.next, ItemStatus.active, ItemStatus.backlog)
-        and not genius_lab.is_genius_lab_stream(db, item.stream_id)
+        and not courses.is_course_stream(db, item.stream_id)
     )
 
 

@@ -64,7 +64,7 @@ export function momentumBarColor(state: string): string {
   }
 }
 
-/** Lab lessons are written by the app; they skip first steps, splitting and dropping. */
+/** Course lessons (Lab, Finance) are written by the app; they skip first steps. */
 export function isLabLessonTitle(title: string | null | undefined): boolean {
-  return /^(Lesson|Math|Physics) \d+:/.test(title ?? '')
+  return /^(Lesson|Math|Physics|Finance|Trading) \d+:/.test(title ?? '')
 }

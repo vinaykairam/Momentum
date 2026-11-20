@@ -12,7 +12,7 @@ from app.models.item import Item, ItemStatus
 from app.models.stream import Stream
 from app.schemas.item import ItemCreate, ItemProgressRequest, ItemResponse, ItemSnoozeRequest, ItemUpdate
 from app.schemas.item_reorder import ItemReorderRequest
-from app.services import genius_lab, item_coach
+from app.services import courses, item_coach
 from app.services.item_queue import item_queue_order, next_queue_position, reorder_item
 from app.services.momentum_engine import refresh_all_stream_momentum
 
@@ -131,7 +131,7 @@ def get_lab_neighbors(item_id: int, db: Session = Depends(get_db)) -> dict:
     item = db.get(Item, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    return genius_lab.lesson_neighbors(db, item)
+    return courses.lesson_neighbors(db, item)
 
 
 @router.patch("/{item_id}", response_model=ItemResponse)
@@ -172,8 +172,8 @@ def update_item(
     db.refresh(item)
 
     if item.status == ItemStatus.completed and previous_status != ItemStatus.completed:
-        if genius_lab.is_genius_lab_stream(db, item.stream_id):
-            background_tasks.add_task(genius_lab.queue_next_lesson)
+        if courses.is_course_stream(db, item.stream_id):
+            background_tasks.add_task(courses.queue_next_lesson)
     return item
 
 
@@ -246,8 +246,8 @@ def split_item(
     item = _get_item_or_404(db, item_id)
     if item.status not in (ItemStatus.next, ItemStatus.active, ItemStatus.backlog):
         raise HTTPException(status_code=400, detail="Only queued items can be split")
-    if genius_lab.is_genius_lab_stream(db, item.stream_id):
-        raise HTTPException(status_code=400, detail="Lab lessons can't be split")
+    if courses.is_course_stream(db, item.stream_id):
+        raise HTTPException(status_code=400, detail="Course lessons can't be split")
     created = item_coach.split_item(db, item)
     if created is None:
         raise HTTPException(status_code=503, detail="Couldn't split this right now. Try again, or edit it by hand.")

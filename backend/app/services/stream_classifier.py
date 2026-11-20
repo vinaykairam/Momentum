@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.models.item import Item
 from app.models.stream import Stream
 from app.schemas.stream_suggestion import StreamSuggestionOption, StreamSuggestionResponse
-from app.services import genius_lab
+from app.services import courses
 from app.services.momentum_engine import stream_display_name
 from app.services.url_metadata import enrich_content_with_url_context
 
@@ -219,8 +219,8 @@ def _build_response(options: list[StreamSuggestionOption], reasoning: str) -> St
 
 def suggest_stream_for_capture(content: str, db: Session) -> StreamSuggestionResponse:
     streams = db.query(Stream).filter(Stream.active.is_(True)).order_by(Stream.name).all()
-    # Lab lessons are written by the app, never captured.
-    streams = [stream for stream in streams if not genius_lab.is_genius_lab_stream(db, stream.id)]
+    # Course lessons (Lab, Finance) are written by the app, never captured.
+    streams = [stream for stream in streams if not courses.is_course_stream(db, stream.id)]
     if not streams:
         return StreamSuggestionResponse(
             status="unavailable",
