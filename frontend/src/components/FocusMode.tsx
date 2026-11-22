@@ -1,7 +1,6 @@
-import { FocusTimer } from '@/components/FocusTimer'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
-import { formatStreamLabel, isLabLessonTitle, isWorkoutTitle } from '@/lib/utils'
+import { formatStreamLabel, isLabLessonTitle } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -19,7 +18,6 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
   const focusMode = useAppStore((s) => s.focusMode)
   const activeFocus = useAppStore((s) => s.activeFocus)
   const exitFocus = useAppStore((s) => s.exitFocus)
-  const autoStartTimer = useAppStore((s) => s.autoStartTimer)
 
   const itemId = activeFocus?.item_id ?? null
   const [notes, setNotes] = useState('')
@@ -85,9 +83,6 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
   const canLogDone = Boolean(
     viewingCurrent && itemId !== null && item && item.status !== 'completed' && item.status !== 'archived',
   )
-  const currentTitle = currentItem?.title ?? activeFocus.action
-  const currentIsLab = isLabLessonTitle(currentTitle) || isWorkoutTitle(currentTitle)
-  const firstStep = currentItem?.first_step ?? activeFocus.first_step
 
   return (
     <AnimatePresence>
@@ -157,23 +152,6 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
                   </button>
                 )}
               </div>
-            )}
-
-            {canLogDone && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.12, duration: 0.4, ease }}
-                className="mt-8 rounded-2xl border border-border p-5"
-              >
-                {firstStep && !currentIsLab && (
-                  <>
-                    <p className="page-meta">First step</p>
-                    <p className="mt-1 mb-4 text-lg leading-relaxed">{firstStep}</p>
-                  </>
-                )}
-                <FocusTimer key={itemId} autoStart={autoStartTimer} />
-              </motion.div>
             )}
 
             {itemId && (itemLoading || (!viewingCurrent && viewedLoading)) ? (

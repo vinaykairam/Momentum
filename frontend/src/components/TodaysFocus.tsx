@@ -1,5 +1,4 @@
 import { FocusCard } from '@/components/FocusCard'
-import { OneThing } from '@/components/OneThing'
 import type { FocusRecommendation } from '@/lib/api'
 import { groupFocusRecommendations } from '@/lib/focus-groups'
 import { motion } from 'framer-motion'
@@ -24,17 +23,12 @@ export function TodaysFocus({ focus }: TodaysFocusProps) {
     )
   }
 
-  const [oneThing, ...rest] = focus
-  const groups = groupFocusRecommendations(rest)
+  const groups = groupFocusRecommendations(focus)
 
   return (
     <div>
-      <div className="mx-auto max-w-2xl">
-        <OneThing key={`${oneThing.stream_id}-${oneThing.item_id}`} focus={oneThing} />
-      </div>
-
-      {rest.length > 0 && (
-        <div className="-mx-6 mt-10 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-6 pb-4 md:snap-none">
+      {groups.length > 0 && (
+        <div className="-mx-6 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-6 pb-4 md:snap-none">
           {groups.map((group, groupIndex) => (
             <motion.section
               key={group.key}

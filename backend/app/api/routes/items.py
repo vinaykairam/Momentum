@@ -112,7 +112,6 @@ def create_item(
     refresh_all_stream_momentum(db)
     db.commit()
     db.refresh(item)
-    background_tasks.add_task(item_coach.fill_first_step, item.id)
     return item
 
 
@@ -154,9 +153,6 @@ def update_item(
     previous_status = item.status
     for key, value in updates.items():
         setattr(item, key, value)
-    if {"title", "description"} & updates.keys() and "first_step" not in updates:
-        item.first_step = None
-        background_tasks.add_task(item_coach.fill_first_step, item.id)
 
     if "status" in updates and updates["status"] != previous_status:
         item.queue_position = next_queue_position(db, item.stream_id, item.status)

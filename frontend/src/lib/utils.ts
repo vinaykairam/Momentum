@@ -65,11 +65,6 @@ export function momentumBarColor(state: string): string {
 }
 
 /** Lab lessons are written by the app; they skip first steps, splitting and dropping. */
-/** Daily workouts are written by the app; like Lab lessons, they have no first step. */
-export function isWorkoutTitle(title: string | null | undefined): boolean {
-  return /^Workout \d+:/.test(title ?? '')
-}
-
 export function isLabLessonTitle(title: string | null | undefined): boolean {
   return /^(Lesson|Math|Physics) \d+:/.test(title ?? '')
 }
