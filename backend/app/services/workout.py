@@ -197,7 +197,8 @@ def _generate(number: int, profile: str, completed: int, history: list[str], tod
         '"exercises": [{"name": "<exercise>", "sets": <number>, "reps": "<target, e.g. 8-10 or 30 s>", '
         '"weight_lb": <number per dumbbell or total bar weight, or null for bodyweight>}]} '
         "where exercises lists only the main WORKOUT section exercises (not warm-up or cool-down), "
-        "in order, matching the text.\n\n"
+        "in order, matching the text exactly: weight_lb is the weight written in that exercise's line, "
+        "or null when the line names no weight.\n\n"
         "Format of the workout text: short and scannable, like a gym whiteboard. No paragraphs, no intro, "
         "no motivation, no explanations, no markdown symbols like # or *. Sections WARM-UP, WORKOUT, "
         "COOL-DOWN, each name in capitals on its own line, then one line per exercise, for example:\n"
