@@ -13,6 +13,8 @@ services:
       CORS_ORIGINS: '["http://localhost","http://localhost:8080","http://127.0.0.1:8080"]'
     volumes:
       - momentum_data:/data
+      # Use the Pi's time zone so "today" (and the daily workout) roll over at local midnight.
+      - /etc/localtime:/etc/localtime:ro
     healthcheck:
       test:
         [

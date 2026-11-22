@@ -1,7 +1,7 @@
 import { FocusTimer } from '@/components/FocusTimer'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
-import { formatStreamLabel, isLabLessonTitle } from '@/lib/utils'
+import { formatStreamLabel, isLabLessonTitle, isWorkoutTitle } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -85,7 +85,8 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
   const canLogDone = Boolean(
     viewingCurrent && itemId !== null && item && item.status !== 'completed' && item.status !== 'archived',
   )
-  const currentIsLab = isLabLessonTitle(currentItem?.title ?? activeFocus.action)
+  const currentTitle = currentItem?.title ?? activeFocus.action
+  const currentIsLab = isLabLessonTitle(currentTitle) || isWorkoutTitle(currentTitle)
   const firstStep = currentItem?.first_step ?? activeFocus.first_step
 
   return (

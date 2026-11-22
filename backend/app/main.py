@@ -17,7 +17,7 @@ from app.core.database import Base, SessionLocal, engine, get_db
 from app.models import Item, Stream
 from app.models.item import ItemEffort, ItemImportance, ItemStatus, ItemType
 from app.models.stream import StreamCategory, StreamType
-from app.services import genius_lab
+from app.services import genius_lab, workout
 from app.services.momentum_engine import generate_daily_focus, refresh_all_stream_momentum
 from app.services.static_home import render_today_page
 from app.services.stream_constants import DEFAULT_STREAM_DESCRIPTIONS, WORKOUT_SUB_STREAMS
@@ -188,6 +188,8 @@ async def lifespan(app: FastAPI):
     ensure_stream_descriptions()
     # Create the Genius Lab stream and first lesson without blocking startup.
     threading.Thread(target=genius_lab.queue_next_lesson, daemon=True).start()
+    # Write today's workout, and a new one each day.
+    threading.Thread(target=workout.run_daily_loop, daemon=True).start()
     yield
 
 

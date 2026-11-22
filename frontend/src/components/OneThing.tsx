@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { api, type FocusRecommendation } from '@/lib/api'
-import { formatStreamLabel, isLabLessonTitle } from '@/lib/utils'
+import { formatStreamLabel, isLabLessonTitle, isWorkoutTitle } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -17,7 +17,7 @@ const ease = [0.25, 0.1, 0.25, 1] as const
 export function OneThing({ focus }: OneThingProps) {
   const queryClient = useQueryClient()
   const enterFocus = useAppStore((s) => s.enterFocus)
-  const isLab = isLabLessonTitle(focus.action)
+  const isLab = isLabLessonTitle(focus.action) || isWorkoutTitle(focus.action)
   const needsStep = focus.item_id !== null && !focus.first_step && !isLab
 
   // Items captured before first steps existed get one written the first time they reach the top.
