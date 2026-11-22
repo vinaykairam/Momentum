@@ -3,8 +3,6 @@ import { OneThing } from '@/components/OneThing'
 import type { FocusRecommendation } from '@/lib/api'
 import { groupFocusRecommendations } from '@/lib/focus-groups'
 import { motion } from 'framer-motion'
-import { ChevronDown } from 'lucide-react'
-import { useState } from 'react'
 
 interface TodaysFocusProps {
   focus: FocusRecommendation[]
@@ -13,8 +11,6 @@ interface TodaysFocusProps {
 const ease = [0.25, 0.1, 0.25, 1] as const
 
 export function TodaysFocus({ focus }: TodaysFocusProps) {
-  const [showRest, setShowRest] = useState(false)
-
   if (focus.length === 0) {
     return (
       <motion.p
@@ -38,19 +34,7 @@ export function TodaysFocus({ focus }: TodaysFocusProps) {
       </div>
 
       {rest.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowRest((open) => !open)}
-          className="page-meta mx-auto mt-10 mb-6 flex items-center gap-1.5 hover:text-foreground"
-          aria-expanded={showRest}
-        >
-          {showRest ? 'Hide' : 'Also today'} · {rest.length} more
-          <ChevronDown className={`h-4 w-4 transition-transform ${showRest ? 'rotate-180' : ''}`} />
-        </button>
-      )}
-
-      {showRest && (
-        <div className="-mx-6 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-6 pb-4 md:snap-none">
+        <div className="-mx-6 mt-10 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-6 pb-4 md:snap-none">
           {groups.map((group, groupIndex) => (
             <motion.section
               key={group.key}
