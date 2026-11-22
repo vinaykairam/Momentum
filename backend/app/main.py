@@ -160,13 +160,15 @@ def ensure_item_queue_position_column() -> None:
 
 
 def ensure_item_coach_columns() -> None:
-    """Columns for first steps, skips and snoozes (SQLite has no migrations here)."""
+    """Columns for first steps, skips, snoozes and workout logs (SQLite has no migrations here)."""
     if not settings.database_url.startswith("sqlite"):
         return
     wanted = {
         "first_step": "TEXT",
         "skip_count": "INTEGER NOT NULL DEFAULT 0",
         "snoozed_until": "DATE",
+        "workout_plan": "JSON",
+        "workout_log": "JSON",
     }
     with engine.connect() as conn:
         existing = {column[1] for column in conn.execute(text("PRAGMA table_info(items)")).fetchall()}

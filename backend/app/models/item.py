@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -77,5 +77,9 @@ class Item(Base):
     skip_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     # Hidden from Today until this date.
     snoozed_until: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Workouts only. Plan: [{name, sets, reps, weight_lb}] written by Gemini.
+    # Log: [{exercise, sets: [{reps, weight}]}] entered after the workout (weight in lb).
+    workout_plan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    workout_log: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
     stream = relationship("Stream", back_populates="items")

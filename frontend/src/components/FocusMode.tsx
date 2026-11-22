@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
-import { api } from '@/lib/api'
-import { formatStreamLabel, isLabLessonTitle } from '@/lib/utils'
+import { cleanWorkoutLog, initialWorkoutLog, WorkoutLog } from '@/components/WorkoutLog'
+import { api, type WorkoutLogEntry } from '@/lib/api'
+import { formatStreamLabel, isLabLessonTitle, isWorkoutTitle } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -21,6 +22,8 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
 
   const itemId = activeFocus?.item_id ?? null
   const [notes, setNotes] = useState('')
+  const [workoutLog, setWorkoutLog] = useState<WorkoutLogEntry[]>([])
+  const [logSaved, setLogSaved] = useState(false)
   // Lab lessons: which lesson is on screen (browsing back through earlier lessons).
   const [viewId, setViewId] = useState<number | null>(itemId)
   useEffect(() => setViewId(itemId), [itemId])
@@ -53,11 +56,28 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
     }
   }, [currentItem?.id, currentItem?.notes])
 
+  const isWorkout = isWorkoutTitle(currentItem?.title)
+  useEffect(() => {
+    setWorkoutLog(currentItem && isWorkout ? initialWorkoutLog(currentItem) : [])
+    setLogSaved(false)
+    // Reset only when a different item opens, not on every refetch.
+  }, [currentItem?.id, isWorkout])
+
+  const saveLogMutation = useMutation({
+    mutationFn: () =>
+      api.updateItem(itemId!, { workout_log: cleanWorkoutLog(workoutLog), notes: notes.trim() || null }),
+    onSuccess: () => {
+      setLogSaved(true)
+      queryClient.invalidateQueries({ queryKey: ['item', itemId] })
+    },
+  })
+
   const completeMutation = useMutation({
     mutationFn: () =>
       api.updateItem(itemId!, {
         status: 'completed',
         notes: notes.trim() || null,
+        ...(isWorkout ? { workout_log: cleanWorkoutLog(workoutLog) } : {}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
@@ -183,6 +203,35 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
                     Open link
                     <ExternalLink className="h-4 w-4" />
                   </motion.a>
+                )}
+
+                {viewingCurrent && isWorkout && item && item.status !== 'completed' && (
+                  <div className="mt-10">
+                    <p className="page-label">Log</p>
+                    <p className="page-meta mt-1 mb-4 text-sm">
+                      Enter what you actually did. The next workouts build on these numbers.
+                    </p>
+                    <WorkoutLog
+                      value={workoutLog}
+                      onChange={(log) => {
+                        setWorkoutLog(log)
+                        setLogSaved(false)
+                      }}
+                      plan={item.workout_plan}
+                    />
+                    <div className="mt-4 flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="md"
+                        disabled={saveLogMutation.isPending}
+                        onClick={() => saveLogMutation.mutate()}
+                      >
+                        {saveLogMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save log'}
+                      </Button>
+                      {logSaved && <span className="page-meta text-thriving">Saved</span>}
+                      {saveLogMutation.isError && <span className="page-meta text-critical">Could not save</span>}
+                    </div>
+                  </div>
                 )}
 
                 {viewingCurrent && itemId && item && (

@@ -68,6 +68,19 @@ export interface StreamSuggestion {
   reasoning: string
 }
 
+export interface WorkoutPlanExercise {
+  name: string
+  sets: number
+  reps: string
+  weight_lb: number | null
+}
+
+export interface WorkoutLogEntry {
+  exercise: string
+  /** reps (or seconds for holds) and weight in lb (null for bodyweight) */
+  sets: { reps: number | null; weight: number | null }[]
+}
+
 export interface Item {
   id: number
   stream_id: number
@@ -87,6 +100,8 @@ export interface Item {
   first_step: string | null
   skip_count: number
   snoozed_until: string | null
+  workout_plan: WorkoutPlanExercise[] | null
+  workout_log: WorkoutLogEntry[] | null
 }
 
 export interface UpdateItemPayload {
@@ -100,6 +115,7 @@ export interface UpdateItemPayload {
   importance?: string
   effort_estimate?: string
   estimated_duration?: number | null
+  workout_log?: WorkoutLogEntry[] | null
 }
 
 export interface LessonRef {
