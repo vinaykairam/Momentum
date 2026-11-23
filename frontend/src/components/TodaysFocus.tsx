@@ -28,14 +28,14 @@ export function TodaysFocus({ focus }: TodaysFocusProps) {
   return (
     <div>
       {groups.length > 0 && (
-        <div className="-mx-6 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-6 pb-4 md:snap-none">
+        <div className="space-y-4">
           {groups.map((group, groupIndex) => (
             <motion.section
               key={group.key}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: groupIndex * 0.06, duration: 0.5, ease }}
-              className="stream-group w-[85vw] max-w-md shrink-0 snap-start md:w-auto md:min-w-[18rem] md:max-w-none md:flex-1"
+              className="stream-group"
             >
               {group.isGrouped && <p className="stream-group-title">{group.parentName}</p>}
               <div className={group.isGrouped ? 'stream-group-items' : undefined}>
