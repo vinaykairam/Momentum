@@ -1,8 +1,8 @@
 """Workout: a stream with one AI-written workout per day, so there's nothing to plan.
 
 Every day the app writes that day's workout (30-40 minutes, strength and mobility, no
-cardio) as an Item in the "Workout" stream. Yesterday's workout, if it wasn't done, is
-archived and counted as skipped. Gemini sees recent workouts, the reps and weights
+cardio) as an Item in the "Workout" stream. A workout that isn't done stays until it is:
+the next one is only written on a day after the last one was completed. Gemini sees recent workouts, the reps and weights
 logged for each set, and the notes written on them (e.g. "lower back felt tight"), so it
 rotates muscle groups, progresses from real numbers and backs off when something hurts. It progresses from calisthenics to dumbbells to the barbell as
 workouts get completed.
@@ -39,7 +39,6 @@ DEFAULT_PROFILE = (
     "and 2 dumbbell handles that share the plates with the barbell. Started with calisthenics."
 )
 
-_TITLE_RE = re.compile(r"^Workout (\d+):")
 _FALLBACK_PREFIX = "Today's workout could not be written"
 _CHECK_EVERY_SECONDS = 15 * 60
 _lock = threading.Lock()
@@ -159,7 +158,7 @@ def _clean_plan(raw: object) -> list[dict]:
     return plan[:12]
 
 
-def _generate(number: int, profile: str, completed: int, history: list[str], today: date) -> dict | None:
+def _generate(profile: str, completed: int, history: list[str], today: date) -> dict | None:
     if not settings.gemini_api_key:
         return None
     system = (
@@ -168,7 +167,7 @@ def _generate(number: int, profile: str, completed: int, history: list[str], tod
         "that flares up an injury is not."
     )
     prompt = (
-        f"Write workout {number} for {today:%A, %B %d}.\n\n"
+        f"Write the workout for {today:%A, %B %d}.\n\n"
         f"Trainee profile (their own words): {profile}\n\n"
         f"They have completed {completed} workouts so far. Current stage: {_phase(completed)}\n\n"
         "Recent workouts, oldest first:\n"
@@ -256,51 +255,45 @@ def _gemini_json(system: str, prompt: str) -> object | None:
 
 
 def ensure_todays_workout() -> None:
-    """Make sure today's workout exists. Archives an undone earlier one. Safe to call repeatedly."""
+    """Make sure there's a workout to do. Safe to call repeatedly.
+
+    An unfinished workout is kept (never skipped). A new one is written only when the last
+    workout was completed on an earlier day, so there's at most one new workout per day.
+    """
     with _lock:
         db = SessionLocal()
         try:
             stream = get_or_create_stream(db)
             today = date.today()
-            workouts = [
-                item
-                for item in db.query(Item).filter(Item.stream_id == stream.id).all()
-                if _TITLE_RE.match(item.title)
-            ]
+            workouts = db.query(Item).filter(Item.stream_id == stream.id).all()
             done_statuses = (ItemStatus.completed, ItemStatus.archived)
-            todays = [w for w in workouts if _local_date(w.created_at) == today]
-            completed = sum(1 for w in workouts if w.status == ItemStatus.completed)
+            pending = [w for w in workouts if w.status not in done_statuses]
+            completed = [w for w in workouts if w.status == ItemStatus.completed]
             history = _history_lines([w for w in workouts if w.status in done_statuses])
 
-            if todays:
-                # Written while Gemini was unavailable: try again.
-                for item in todays:
-                    if item.status not in done_statuses and (item.description or "").startswith(_FALLBACK_PREFIX):
-                        number = int(_TITLE_RE.match(item.title).group(1))
-                        result = _generate(number, stream.description or DEFAULT_PROFILE, completed, history, today)
+            if pending:
+                for item in pending:
+                    if (item.description or "").startswith(_FALLBACK_PREFIX):
+                        # Written while Gemini was unavailable: try again.
+                        result = _generate(stream.description or DEFAULT_PROFILE, len(completed), history, today)
                         if result:
-                            item.title = f"Workout {number}: {result['focus']}"
+                            item.title = result["focus"]
                             item.description = result["workout"]
                             item.workout_plan = result["plan"]
-                    elif item.status not in done_statuses and not item.workout_plan and item.description:
+                    elif not item.workout_plan and item.description:
                         item.workout_plan = _extract_plan(item.description)
                 db.commit()
                 return
 
-            for item in workouts:
-                if item.status not in done_statuses:
-                    item.status = ItemStatus.archived
-                    item.queue_position = next_queue_position(db, stream.id, ItemStatus.archived)
-            db.flush()
-            history = _history_lines([w for w in workouts if w.status in done_statuses])
+            if any(_local_date(w.updated_at) == today for w in completed):
+                return  # today's workout is done; the next one comes tomorrow
 
-            number = max((int(_TITLE_RE.match(w.title).group(1)) for w in workouts), default=0) + 1
-            result = _generate(number, stream.description or DEFAULT_PROFILE, completed, history, today)
+            result = _generate(stream.description or DEFAULT_PROFILE, len(completed), history, today)
             plan = None
             if result:
-                title, text, plan = f"Workout {number}: {result['focus']}", result["workout"], result["plan"]
+                title, text, plan = result["focus"], result["workout"], result["plan"]
             else:
-                title = f"Workout {number}: Bodyweight basics"
+                title = "Bodyweight basics"
                 text = (
                     f"{_FALLBACK_PREFIX} automatically (Gemini unavailable); the app will retry.\n\n"
                     "Until then, a gentle routine: 5 minutes of easy mobility, then 3 rounds of "

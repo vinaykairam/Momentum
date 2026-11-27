@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { cleanWorkoutLog, initialWorkoutLog, WorkoutLog } from '@/components/WorkoutLog'
 import { api, type WorkoutLogEntry } from '@/lib/api'
-import { formatStreamLabel, isLabLessonTitle, isWorkoutTitle } from '@/lib/utils'
+import { formatStreamLabel, isLabLessonTitle } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -56,7 +56,8 @@ export function FocusMode({ nextFocus }: FocusModeProps) {
     }
   }, [currentItem?.id, currentItem?.notes])
 
-  const isWorkout = isWorkoutTitle(currentItem?.title)
+  // Daily workouts (written by the app) get a reps/weight log.
+  const isWorkout = activeFocus?.stream_name === 'Workout' && !activeFocus?.parent_stream_name
   useEffect(() => {
     setWorkoutLog(currentItem && isWorkout ? initialWorkoutLog(currentItem) : [])
     setLogSaved(false)
